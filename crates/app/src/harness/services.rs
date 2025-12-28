@@ -358,25 +358,6 @@ fn binary_candidates(name: &str) -> Vec<PathBuf> {
     paths
 }
 
-async fn wait_for_port(name: &str, port: u16, logs_dir: &Path, timeout_at: Duration) -> Result<()> {
-    let start = Instant::now();
-    let addr = format!("127.0.0.1:{port}");
-    loop {
-        match TcpStream::connect(&addr).await {
-            Ok(_) => {
-                write_probe(logs_dir, name, "port open")?;
-                return Ok(());
-            }
-            Err(err) => {
-                if start.elapsed() > timeout_at {
-                    bail!("{name} did not open port {addr} in time: {err}");
-                }
-                sleep(Duration::from_millis(250)).await;
-            }
-        }
-    }
-}
-
 fn write_probe(logs_dir: &Path, service: &str, message: &str) -> Result<()> {
     let probe = logs_dir.join(format!("probe-{service}.log"));
     let mut file = fs::OpenOptions::new()
