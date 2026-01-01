@@ -56,10 +56,8 @@ jobs:
           PACK_INDEX_URL: file://${{ github.workspace }}/target/index.json
           GREENTIC_PROVIDER_CORE_ONLY: "1"
         run: |
-          cargo test -p greentic-integration \
-            pack_index_shape_matches_runner_contract \
-            e2e_messaging_dummy_send \
-            e2e_secrets_k8s_smoke \
-            e2e_events_publish \
-            events_manifest_guard \
-            -- --nocapture
+          cargo test -p greentic-integration pack_index_shape_matches_runner_contract -- --nocapture
+          cargo test -p greentic-integration e2e_messaging_dummy_send -- --nocapture
+          cargo test -p greentic-integration e2e_secrets_k8s_smoke -- --nocapture
+          cargo test -p greentic-integration e2e_events_publish -- --nocapture
+          cargo test -p greentic-integration events_manifest_guard -- --nocapture
