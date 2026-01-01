@@ -1,22 +1,19 @@
-greentic-packs/messaging-dummy
+greentic-packs/messaging-dummy:0.0.0-cf9c737f5260b61495a13855ce525dc34feab866
 
-greentic-packs/messaging-webchat
-greentic-packs/messaging-slack
-greentic-packs/messaging-webex
-greentic-packs/messaging-teams
-greentic-packs/messaging-whatsapp
-greentic-packs/messaging-telegram
-greentic-packs/messaging-email
+greentic-packs/messaging-webchat:0.0.0-cf9c737f5260b61495a13855ce525dc34feab866
+greentic-packs/messaging-slack:0.0.0-cf9c737f5260b61495a13855ce525dc34feab866
+greentic-packs/messaging-webex:0.0.0-cf9c737f5260b61495a13855ce525dc34feab866
+greentic-packs/messaging-teams:0.0.0-cf9c737f5260b61495a13855ce525dc34feab866
+greentic-packs/messaging-whatsapp:0.0.0-cf9c737f5260b61495a13855ce525dc34feab866
+greentic-packs/messaging-telegram:0.0.0-cf9c737f5260b61495a13855ce525dc34feab866
+greentic-packs/messaging-email:0.0.0-cf9c737f5260b61495a13855ce525dc34feab866
 
-greentic-packs/secrets-k8s
-greentic-packs/secrets-aws-sm
-greentic-packs/secrets-azure-kv
-greentic-packs/secrets-gcp-sm
-greentic-packs/secrets-vault-kv
-greentic-packs/secrets-providers
+greentic-packs/secrets-k8s:0.4.10
+greentic-packs/secrets-aws-sm:0.4.10
+greentic-packs/secrets-azure-kv:0.4.10
+greentic-packs/secrets-gcp-sm:0.4.10
+greentic-packs/secrets-vault-kv:0.4.10
+greentic-packs/secrets-providers:0.4.10
 
-greentic-packs/events-dummy
-greentic-packs/events-timer
-greentic-packs/events-sms
-greentic-packs/events-email
-greentic-packs/events-webhook
+# Events: prefer deterministic dummy; add timer/webhook later if needed.
+greentic-packs/events-dummy:0.4.4
