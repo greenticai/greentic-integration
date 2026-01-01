@@ -28,7 +28,7 @@ runner.smoke: ## Run runner smoke tests (PR-INT-06)
 	@cargo run -p runner-smoke -- --cases harness/runner-smoke/cases
 
 app.test: ## Run app crate unit tests (session/resume/runner stubs)
-	@cargo test -p greentic-integration
+	@GREENTIC_PROVIDER_CORE_ONLY=1 cargo test -p greentic-integration
 
 render.snapshot: ## Capture renderer snapshots (PR-INT-05)
 	@cargo test -p providers-sim -- render_reports_match_golden
