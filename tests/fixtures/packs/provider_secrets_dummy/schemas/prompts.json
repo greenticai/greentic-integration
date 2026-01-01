@@ -1,0 +1,7 @@
+[
+  {
+    "field": "namespace",
+    "label": "Secrets namespace",
+    "description": "Enter a namespace to scope secret keys"
+  }
+]

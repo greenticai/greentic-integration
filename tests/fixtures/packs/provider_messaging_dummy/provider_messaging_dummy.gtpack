@@ -1,0 +1,16 @@
+{
+  "id": "provider_messaging_dummy",
+  "name": "Dummy provider-core messaging pack",
+  "version": "0.0.1",
+  "kind": "provider",
+  "provider_core": {
+    "provider_type": "messaging",
+    "capabilities": ["send"],
+    "operations": {
+      "send": {"schema": "schemas/send_message.json"}
+    },
+    "config_schema": "schemas/config.schema.json",
+    "prompts_schema": "schemas/prompts.json",
+    "validate_config": "schemas/validate_config.json"
+  }
+}

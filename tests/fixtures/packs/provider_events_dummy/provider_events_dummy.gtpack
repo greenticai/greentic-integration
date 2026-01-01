@@ -1,0 +1,16 @@
+{
+  "id": "provider_events_dummy",
+  "name": "Dummy provider-core events pack",
+  "version": "0.0.1",
+  "kind": "provider",
+  "provider_core": {
+    "provider_type": "events",
+    "capabilities": ["publish"],
+    "operations": {
+      "publish": {"schema": "schemas/publish_event.json"}
+    },
+    "config_schema": "schemas/config.schema.json",
+    "prompts_schema": "schemas/prompts.json",
+    "validate_config": "schemas/validate_config.json"
+  }
+}

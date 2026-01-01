@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dummy events provider config",
+  "type": "object",
+  "properties": {
+    "topic_prefix": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Prefix to apply to published topics"
+    }
+  },
+  "required": ["topic_prefix"],
+  "additionalProperties": false
+}

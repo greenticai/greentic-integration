@@ -15,6 +15,8 @@ fn e2e_regression_suite() -> Result<()> {
         "e2e_greentic_dev_offline",
         "e2e_greentic_dev_snapshot",
         "e2e_greentic_dev_multi_pack",
+        "pr14_provider_core_flows_and_index",
+        "pr14_provider_core_schema_onboarding",
     ];
     for name in tests {
         let status = Command::new("cargo")

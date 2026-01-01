@@ -1,0 +1,7 @@
+[
+  {
+    "field": "channel",
+    "label": "Messaging channel",
+    "description": "Channel or queue to echo messages into"
+  }
+]

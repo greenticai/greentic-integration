@@ -1,0 +1,7 @@
+[
+  {
+    "field": "topic_prefix",
+    "label": "Topic prefix",
+    "description": "Prefix to namespace emitted topics"
+  }
+]

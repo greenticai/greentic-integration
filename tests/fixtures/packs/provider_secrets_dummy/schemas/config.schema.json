@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dummy secrets provider config",
+  "type": "object",
+  "properties": {
+    "namespace": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Isolated namespace for secrets"
+    }
+  },
+  "required": ["namespace"],
+  "additionalProperties": false
+}

@@ -41,7 +41,14 @@ while [[ $# -gt 0 ]]; do
 done
 
 tests_l0=("e2e_smoke" "e2e_scenario_smoke")
-tests_l1=("${tests_l0[@]}" "e2e_retry_backoff_flaky_tool" "e2e_config_precedence" "e2e_pack_lifecycle")
+tests_l1=(
+  "${tests_l0[@]}"
+  "e2e_retry_backoff_flaky_tool"
+  "e2e_config_precedence"
+  "e2e_pack_lifecycle"
+  "pr14_provider_core_flows_and_index"
+  "pr14_provider_core_schema_onboarding"
+)
 tests_l2=("${tests_l1[@]}" "e2e_infra" "e2e_stack_boot" "e2e_multi_tenant_isolation")
 
 select_tests() {
@@ -65,6 +72,7 @@ if [[ "${E2E_KEEP:-0}" != "1" && -d target/e2e ]]; then
 fi
 
 export RUST_LOG=${RUST_LOG:-info}
+export GREENTIC_PROVIDER_CORE_ONLY=1
 echo "Running E2E tier '$tier' (focus: ${focus:-none})"
 echo "Tests: ${tests[*]}"
 

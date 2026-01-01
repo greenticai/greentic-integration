@@ -1,0 +1,62 @@
+name: e2e_packs_oci
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/e2e_packs_oci.yml"
+      - "scripts/oci_resolve_digests.sh"
+      - "scripts/make_pack_index.sh"
+      - "tests/packs/**"
+      - "tests/**/*.rs"
+      - "crates/app/tests/**"
+
+jobs:
+  e2e-packs-oci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install crane and jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          curl -fsSL https://github.com/google/go-containerregistry/releases/download/v0.20.1/go-containerregistry_Linux_x86_64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin crane
+
+      - name: Resolve OCI digests
+        env:
+          ALLOW_LATEST: "1"
+          PACKS_MANIFEST: tests/packs/manifest.txt
+          DOCKER_CONFIG: /home/runner/.docker
+        run: |
+          scripts/oci_resolve_digests.sh
+
+      - name: Generate pack index
+        env:
+          TENANT_NAME: integration
+          MAIN_PACK_NAME: greentic-packs/messaging-dummy
+          OVERLAY_PACK_NAMES: greentic-packs/secrets-k8s,greentic-packs/events-dummy
+        run: |
+          scripts/make_pack_index.sh
+
+      - name: Run E2E tests (OCI packs)
+        env:
+          PACK_INDEX_URL: file://${{ github.workspace }}/target/index.json
+          GREENTIC_PROVIDER_CORE_ONLY: "1"
+        run: |
+          cargo test -p greentic-integration \
+            pack_index_shape_matches_runner_contract \
+            e2e_messaging_dummy_send \
+            e2e_secrets_k8s_smoke \
+            e2e_events_publish \
+            events_manifest_guard \
+            -- --nocapture
