@@ -8,6 +8,7 @@ use serde_json::Value;
 pub struct PackReference {
     pub name: String,
     #[serde(default)]
+    #[allow(dead_code)]
     pub version: Option<String>,
 }
 
@@ -16,11 +17,12 @@ pub struct PackEntry {
     pub reference: PackReference,
     pub locator: String,
     #[serde(default)]
+    #[allow(dead_code)]
     pub digest: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-struct TenantEntry {
+pub struct TenantEntry {
     main_pack: PackEntry,
     #[serde(default)]
     overlays: Vec<PackEntry>,

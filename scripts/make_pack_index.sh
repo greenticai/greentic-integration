@@ -91,9 +91,9 @@ if [[ ${#overlay_entries[@]} -gt 0 ]]; then
 fi
 
 {
-  printf '{"tenants":{';
+  printf '{"tenants":';
   printf '%s' "$(jq -n --arg tenant "$TENANT_NAME" --argjson main "$main_entry" --argjson overlays "$overlays_json" '{($tenant): {main_pack: $main, overlays: $overlays}}')";
-  printf '}}\n';
+  printf '}\n';
 } >"$OUT"
 
 echo "Wrote $OUT" >&2

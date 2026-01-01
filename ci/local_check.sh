@@ -59,6 +59,9 @@ fi
 
 CARGO_CMD=(cargo "+${TOOLCHAIN}")
 
+# Enable provider-core E2E tests by default for local check runs.
+export GREENTIC_PROVIDER_CORE_ONLY="${GREENTIC_PROVIDER_CORE_ONLY:-1}"
+
 run_step "cargo fmt" "${CARGO_CMD[@]}" fmt -- --check
 run_step "cargo clippy" "${CARGO_CMD[@]}" clippy --all-targets --all-features -- -D warnings
 run_step "cargo test" "${CARGO_CMD[@]}" test --workspace
