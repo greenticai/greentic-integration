@@ -16,7 +16,8 @@ use std::thread;
 use std::time::Duration;
 use tempfile::tempdir;
 use walkdir::WalkDir;
-use which::which;
+#[path = "support/mod.rs"]
+mod support;
 
 /// End-to-end greentic-dev workflow: scaffold component -> build -> pack -> add-step -> build -> run.
 #[test]
@@ -26,17 +27,14 @@ fn pr13_greentic_dev_component_pack_flow() -> Result<()> {
     println!("workspace: {}", work.display());
     let strict = strict_dev_e2e() || std::env::var("CI").is_ok();
 
-    let greentic_dev = which_greentic_dev()?;
-    let packc = match which("packc") {
-        Ok(p) => p,
-        Err(err) => {
-            if strict {
-                return Err(err).context("packc binary not found on PATH in strict mode");
-            } else {
-                eprintln!("skipping greentic-dev e2e: packc not found ({err})");
-                return Ok(());
-            }
-        }
+    let greentic_dev =
+        match support::ensure_tool("greentic-dev", "greentic-dev", strict, "greentic-dev")? {
+            Some(p) => p,
+            None => return Ok(()),
+        };
+    let packc = match support::ensure_tool("packc", "packc", strict, "packc")? {
+        Some(p) => p,
+        None => return Ok(()),
     };
     // Provide a local greentic-dev config so commands requiring a distributor profile succeed.
     let home_dir = work.join("home");
@@ -359,10 +357,6 @@ fn base_env(
             config.to_string_lossy().into_owned(),
         ),
     ]
-}
-
-fn which_greentic_dev() -> Result<PathBuf> {
-    which("greentic-dev").context("greentic-dev binary not found on PATH")
 }
 
 fn run_cmd(

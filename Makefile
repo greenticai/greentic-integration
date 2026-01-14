@@ -8,6 +8,7 @@ COMPOSE ?= docker compose
 STACK_FILE := compose/stack.yml
 
 .PHONY: help stack-up stack-down packs.test runner.smoke render.snapshot webchat.e2e dev.min dev.full webchat.contract golden.update app.test
+.PHONY: test.all
 
 help: ## Show available commands
 	@printf "\nGreentic Integration Make targets\n\n"
@@ -38,6 +39,18 @@ webchat.contract: ## Run WebChat backend contract tests (PR-INT-07)
 
 webchat.e2e: ## Run WebChat Playwright E2E suite (PR-INT-08)
 	@$(SCRIPTS_DIR)/run_webchat_e2e.sh
+
+test.all: ## Run full integration test suite (packs + app + smoke + renderer + webchat)
+	@set -euo pipefail; \
+	$(MAKE) packs.test; \
+	$(MAKE) app.test; \
+	$(MAKE) runner.smoke; \
+	$(MAKE) render.snapshot; \
+	$(MAKE) webchat.contract; \
+	$(MAKE) webchat.e2e;
+
+test.summary: ## Run all suites and print a consolidated pass/fail summary
+	@bash $(SCRIPTS_DIR)/run_all_tests.sh
 
 component.deploy-plan: ## Build the deploy-plan guest component and copy it into packs/deploy-generic
 	@$(SCRIPTS_DIR)/build_deploy_component.sh

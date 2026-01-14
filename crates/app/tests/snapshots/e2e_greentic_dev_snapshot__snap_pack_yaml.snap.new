@@ -1,6 +1,7 @@
 ---
 source: crates/app/tests/e2e_greentic_dev_snapshot.rs
-expression: snap_pack_yaml
+assertion_line: 79
+expression: normalized_pack
 ---
 {
   "assets": [],

@@ -1,0 +1,8 @@
+{
+  "original_reference": "ghcr.io/greentic-ai/components/templates:latest",
+  "resolved_digest": "sha256:57183bcc54aa334cd56d1e2ef85cf18977d42836c5e1adc68938b9aa2300502e",
+  "media_type": "application/vnd.greentic.component.manifest+json",
+  "fetched_at_unix_seconds": 1768209856,
+  "size_bytes": 5331,
+  "manifest_digest": "sha256:57183bcc54aa334cd56d1e2ef85cf18977d42836c5e1adc68938b9aa2300502e"
+}

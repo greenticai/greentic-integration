@@ -4,7 +4,9 @@ use std::process::Command;
 
 use anyhow::{Context, Result};
 use tempfile::tempdir;
-use which::which;
+
+#[path = "support/mod.rs"]
+mod support;
 
 /// Negative greentic-dev scenarios: invalid build/flows/add-step should fail with clear errors.
 #[test]
@@ -14,17 +16,11 @@ fn greentic_dev_negative_scenarios() -> Result<()> {
         .unwrap_or(false)
         || std::env::var("CI").is_ok();
 
-    let greentic_dev = match which("greentic-dev") {
-        Ok(p) => p,
-        Err(err) => {
-            if strict {
-                return Err(err).context("greentic-dev binary not found in strict mode");
-            } else {
-                eprintln!("skipping negative greentic-dev tests: greentic-dev not found ({err})");
-                return Ok(());
-            }
-        }
-    };
+    let greentic_dev =
+        match support::ensure_tool("greentic-dev", "greentic-dev", strict, "greentic-dev")? {
+            Some(p) => p,
+            None => return Ok(()),
+        };
 
     let tmp = tempdir().context("tempdir")?;
     let work = tmp.path();
@@ -207,6 +203,18 @@ fn greentic_dev_negative_scenarios() -> Result<()> {
             || add_out.stderr.to_lowercase().contains("not found"),
         "expected invalid insertion error, got stderr: {}",
         add_out.stderr
+    );
+    // Ensure flow did not mutate on failed add-step.
+    let flow_file = pack_add_step.join("flows/main.ygtc");
+    let flow: serde_yaml_bw::Value = serde_yaml_bw::from_str(&fs::read_to_string(&flow_file)?)?;
+    let nodes = flow
+        .get("nodes")
+        .and_then(|v| v.as_mapping())
+        .map(|m| m.len())
+        .unwrap_or(0);
+    assert_eq!(
+        nodes, 1,
+        "flow should remain unchanged after failed add-step (nodes={nodes})"
     );
 
     // 4) Pack build fails on invalid flow.

@@ -5,7 +5,9 @@ use std::process::Command;
 
 use anyhow::{Context, Result};
 use tempfile::tempdir;
-use which::which;
+
+#[path = "support/mod.rs"]
+mod support;
 
 /// Snapshot stability for greentic-dev generated flows and packs.
 #[test]
@@ -15,17 +17,11 @@ fn greentic_dev_snapshots_are_stable() -> Result<()> {
         .unwrap_or(false)
         || std::env::var("CI").is_ok();
 
-    let greentic_dev = match which("greentic-dev") {
-        Ok(p) => p,
-        Err(err) => {
-            if strict {
-                return Err(err).context("greentic-dev binary not found in strict mode");
-            } else {
-                eprintln!("skipping snapshot test: greentic-dev not found ({err})");
-                return Ok(());
-            }
-        }
-    };
+    let greentic_dev =
+        match support::ensure_tool("greentic-dev", "greentic-dev", strict, "greentic-dev")? {
+            Some(p) => p,
+            None => return Ok(()),
+        };
 
     let tmp = tempdir().context("tempdir")?;
     let work = tmp.path();
@@ -76,6 +72,20 @@ fn greentic_dev_snapshots_are_stable() -> Result<()> {
             String::from_utf8_lossy(&add_out.stderr)
         );
     }
+    // Require flow to be mutated: expect an extra node beyond 'start'.
+    let flow_yaml = fs::read_to_string(pack_dir.join("flows/main.ygtc"))?;
+    let flow_json: serde_json::Value = serde_yaml_bw::from_str(&flow_yaml)?;
+    let nodes = flow_json
+        .get("nodes")
+        .and_then(|v| v.as_object())
+        .cloned()
+        .unwrap_or_default();
+    let node_ids: Vec<_> = nodes.keys().cloned().collect();
+    assert!(
+        nodes.len() > 1,
+        "add-step did not add a node; nodes present: {:?}",
+        node_ids
+    );
 
     // Snapshot pack.yaml
     let pack_yaml = fs::read_to_string(pack_dir.join("pack.yaml"))?;

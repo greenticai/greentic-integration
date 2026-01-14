@@ -5,22 +5,19 @@ use std::process::Command;
 use anyhow::{Context, Result};
 use pathdiff::diff_paths;
 use tempfile::tempdir;
-use which::which;
+
+#[path = "support/mod.rs"]
+mod support;
 
 /// Two packs sharing a component plus isolation check between pack builds.
 #[test]
 fn greentic_dev_multi_pack_shared_component() -> Result<()> {
     let strict = is_strict();
-    let greentic_dev = match which("greentic-dev") {
-        Ok(p) => p,
-        Err(err) => {
-            if strict {
-                return Err(err).context("greentic-dev not found in strict mode");
-            }
-            eprintln!("skipping multi-pack test: greentic-dev not found ({err})");
-            return Ok(());
-        }
-    };
+    let greentic_dev =
+        match support::ensure_tool("greentic-dev", "greentic-dev", strict, "greentic-dev")? {
+            Some(p) => p,
+            None => return Ok(()),
+        };
 
     let tmp = tempdir().context("tempdir")?;
     let work = tmp.path();
@@ -78,6 +75,11 @@ fn greentic_dev_multi_pack_shared_component() -> Result<()> {
         .join("target/wasm32-wasip2/release/shared_comp.wasm")
         .canonicalize()
         .context("locate shared wasm")?;
+    assert!(
+        wasm_path.exists(),
+        "expected built shared component at {}",
+        wasm_path.display()
+    );
 
     // Pack A and B.
     let pack_a = work.join("pack-a");
@@ -101,11 +103,13 @@ fn greentic_dev_multi_pack_shared_component() -> Result<()> {
 
     write_shared_pack(&pack_a, "pack-a.shared", &wasm_path)?;
     write_shared_pack(&pack_b, "pack-b.shared", &wasm_path)?;
+    rewrite_flow_for_shared_component(&pack_a, "pack-a.shared")?;
+    rewrite_flow_for_shared_component(&pack_b, "pack-b.shared")?;
 
     // Build both packs.
     run_status(
         &greentic_dev,
-        &["pack", "build", "--in", "."],
+        &["pack", "build", "--in", ".", "--allow-oci-tags"],
         &pack_a,
         &envs,
         "pack build A",
@@ -114,12 +118,54 @@ fn greentic_dev_multi_pack_shared_component() -> Result<()> {
     let pack_b_yaml_before = fs::read_to_string(pack_b.join("pack.yaml"))?;
     run_status(
         &greentic_dev,
-        &["pack", "build", "--in", "."],
+        &["pack", "build", "--in", ".", "--allow-oci-tags"],
         &pack_b,
         &envs,
         "pack build B",
         strict,
     )?;
+    // Re-run pack B build in non-strict mode to surface build stderr if missing artifact.
+    if find_gtpack(&pack_b).is_err() && !strict {
+        eprintln!("pack B build produced no gtpack; stdout/stderr follow");
+        let _ = run_capture(
+            &greentic_dev,
+            &["pack", "build", "--in", ".", "--allow-oci-tags"],
+            &pack_b,
+            &envs,
+            "pack build B (diagnostic)",
+            strict,
+        );
+    }
+    let pack_b_gtpack = find_gtpack(&pack_b)
+        .context("gtpack for pack B not found; ensure pack build produced artifacts")?;
+    // Sanity: run pack B to ensure shared component is usable and outputs expected marker.
+    let runner_cli = match support::ensure_tool(
+        "greentic-runner-cli",
+        "greentic-runner-cli",
+        strict,
+        "greentic-runner-cli",
+    )? {
+        Some(p) => p,
+        None => return Ok(()),
+    };
+    let run_out_b = run_capture(
+        &runner_cli,
+        &[
+            "--pack",
+            pack_b_gtpack.to_str().unwrap(),
+            "--input",
+            r#""hello""#,
+        ],
+        &pack_b,
+        &envs,
+        "pack run B",
+        strict,
+    )?;
+    assert!(
+        run_out_b.contains("SHARED::HELLO"),
+        "pack B run output missing shared component marker: {}",
+        run_out_b
+    );
 
     // Isolation: mutate Pack A flow, rebuild A, ensure Pack B manifest unchanged.
     let flow_path = pack_a.join("flows/main.ygtc");
@@ -134,7 +180,7 @@ fn greentic_dev_multi_pack_shared_component() -> Result<()> {
     fs::write(&flow_path, serde_yaml_bw::to_string(&flow_yaml)?)?;
     run_status(
         &greentic_dev,
-        &["pack", "build", "--in", "."],
+        &["pack", "build", "--in", ".", "--allow-oci-tags"],
         &pack_a,
         &envs,
         "pack build A (modified)",
@@ -171,7 +217,7 @@ fn write_shared_pack(pack_dir: &Path, comp_id: &str, wasm: &Path) -> Result<()> 
             ),
             (
                 serde_yaml_bw::Value::from("world"),
-                serde_yaml_bw::Value::from("greentic:component/stub"),
+                serde_yaml_bw::Value::from("greentic:component/component@0.5.0"),
             ),
             (
                 serde_yaml_bw::Value::from("supports"),
@@ -221,7 +267,52 @@ fn write_shared_pack(pack_dir: &Path, comp_id: &str, wasm: &Path) -> Result<()> 
         serde_yaml_bw::Value::from("components"),
         serde_yaml_bw::Value::Sequence(comps),
     );
+    mapping.insert(
+        serde_yaml_bw::Value::from("extensions"),
+        serde_yaml_bw::Value::Mapping(serde_yaml_bw::Mapping::new()),
+    );
     fs::write(&pack_yaml, serde_yaml_bw::to_string(&doc)?)?;
+    Ok(())
+}
+
+fn rewrite_flow_for_shared_component(pack_dir: &Path, comp_id: &str) -> Result<()> {
+    let flow_path = pack_dir.join("flows/main.ygtc");
+    let mut doc: serde_yaml_bw::Value = serde_yaml_bw::from_str(&fs::read_to_string(&flow_path)?)?;
+    let mapping = doc.as_mapping_mut().context("flow yaml mapping")?;
+    let nodes_value = mapping
+        .get_mut(&serde_yaml_bw::Value::from("nodes"))
+        .context("flow nodes missing")?;
+    let nodes = nodes_value.as_mapping_mut().context("flow nodes mapping")?;
+    let start_key = serde_yaml_bw::Value::from("start");
+    let start_node = nodes
+        .get_mut(&start_key)
+        .context("flow start node missing")?;
+    let start_map = start_node
+        .as_mapping_mut()
+        .context("flow start node mapping")?;
+    start_map.clear();
+    let mut component = serde_yaml_bw::Mapping::new();
+    component.insert(
+        serde_yaml_bw::Value::from("id"),
+        serde_yaml_bw::Value::from(comp_id),
+    );
+    component.insert(
+        serde_yaml_bw::Value::from("operation"),
+        serde_yaml_bw::Value::from("handle_message"),
+    );
+    component.insert(
+        serde_yaml_bw::Value::from("input"),
+        serde_yaml_bw::Value::from("hello"),
+    );
+    start_map.insert(
+        serde_yaml_bw::Value::from("component"),
+        serde_yaml_bw::Value::Mapping(component),
+    );
+    start_map.insert(
+        serde_yaml_bw::Value::from("routing"),
+        serde_yaml_bw::Value::from("out"),
+    );
+    fs::write(&flow_path, serde_yaml_bw::to_string(&doc)?)?;
     Ok(())
 }
 
@@ -316,4 +407,55 @@ fn is_strict() -> bool {
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false)
         || std::env::var("CI").is_ok()
+}
+
+fn run_capture(
+    bin: &Path,
+    args: &[&str],
+    cwd: &Path,
+    envs: &[(String, String)],
+    label: &str,
+    strict: bool,
+) -> Result<String> {
+    let output = Command::new(bin)
+        .args(args)
+        .current_dir(cwd)
+        .envs(envs.iter().cloned())
+        .output()
+        .with_context(|| format!("{label} failed to spawn"))?;
+    if !output.status.success() {
+        if strict {
+            anyhow::bail!(
+                "{label} failed in strict mode: {:?}\nstderr:\n{}",
+                output.status.code(),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        eprintln!(
+            "{label} failed (non-strict): {:?}\nstderr:\n{}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return Err(anyhow::anyhow!("non-strict skip"));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+fn find_gtpack(pack_dir: &Path) -> Result<PathBuf> {
+    for root in ["dist", "target"] {
+        let root_path = pack_dir.join(root);
+        if !root_path.exists() {
+            continue;
+        }
+        for entry in walkdir::WalkDir::new(&root_path)
+            .into_iter()
+            .filter_map(Result::ok)
+        {
+            let path = entry.path();
+            if path.extension().map(|ext| ext == "gtpack").unwrap_or(false) {
+                return Ok(path.to_path_buf());
+            }
+        }
+    }
+    anyhow::bail!("gtpack not found under {}", pack_dir.display())
 }

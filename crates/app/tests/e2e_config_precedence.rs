@@ -3,16 +3,50 @@ use std::path::PathBuf;
 
 use greentic_integration::harness::{ConfigLayers, TestEnv, apply_secrets, load_toml};
 use serde_json::json;
+use std::sync::Once;
+use std::time::{Duration, Instant};
+
+static LOG_INIT: Once = Once::new();
+
+fn init_logging() {
+    LOG_INIT.call_once(|| {
+        crate::support::init_test_logging();
+    });
+}
+
+#[path = "support/mod.rs"]
+mod support;
 
 #[tokio::test]
 async fn e2e_config_secrets_precedence() -> anyhow::Result<()> {
+    init_logging();
+    eprintln!("[e2e_config_precedence] starting test");
     if !greentic_integration::harness::docker_available() {
         eprintln!("skipping e2e_config_precedence: docker daemon not available");
         return Ok(());
     }
 
-    let env = TestEnv::up().await?;
-    env.healthcheck().await?;
+    let t0 = Instant::now();
+    println!("[e2e_config_precedence] starting TestEnv::up");
+    let env = match tokio::time::timeout(Duration::from_secs(90), TestEnv::up()).await {
+        Ok(Ok(env)) => env,
+        Ok(Err(err)) => return Err(err),
+        Err(_) => anyhow::bail!("TestEnv::up timed out after 90s"),
+    };
+    println!(
+        "[e2e_config_precedence] TestEnv::up took {:.1?}",
+        t0.elapsed()
+    );
+    println!("[e2e_config_precedence] starting healthcheck");
+    match tokio::time::timeout(Duration::from_secs(30), env.healthcheck()).await {
+        Ok(Ok(())) => {}
+        Ok(Err(err)) => return Err(err),
+        Err(_) => anyhow::bail!("healthcheck timed out after 30s"),
+    }
+    println!(
+        "[e2e_config_precedence] healthcheck took {:.1?}",
+        t0.elapsed()
+    );
 
     let fixtures_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -94,5 +128,9 @@ async fn e2e_config_secrets_precedence() -> anyhow::Result<()> {
     )?;
 
     env.down().await?;
+    println!(
+        "[e2e_config_precedence] total duration {:.1?}",
+        t0.elapsed()
+    );
     Ok(())
 }

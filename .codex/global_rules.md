@@ -70,3 +70,61 @@ Whenever I ask you to implement a change, feature, refactor, or bugfix (i.e. PR-
 ---
 
 The “Repo Overview Maintenance” routine is defined in `.codex/repo_overview_task.md`. Follow it exactly whenever instructed above.
+
+---
+
+## GLOBAL RULE – TEST INTEGRITY (NO GREEN TESTS FOR BROKEN BEHAVIOR)
+
+For THIS REPOSITORY, when writing or modifying tests you must ALWAYS optimize for
+*detecting defects*, not for making CI pass.
+
+### 1) “Semantic over superficial” rule (MANDATORY)
+A test is invalid if it only checks:
+- exit code success/failure
+- file existence
+- log substrings
+- snapshot/golden files of raw YAML/JSON without semantic parsing
+
+Instead, tests must validate **meaningful semantics**, e.g. by parsing artifacts and
+asserting invariants (graph structure, reachability, IDs, references, schema validity).
+
+### 2) Snapshot safety rule (MANDATORY)
+Snapshots/golden files are allowed only if:
+- they represent the **intended** behavior (not the current output),
+- and each snapshot test is paired with at least **one semantic assertion**
+  derived from parsing the artifact.
+
+Never “update snapshots to make tests green” if the output is suspected wrong.
+If output seems wrong, keep the failing test and fix the generator/logic.
+
+### 3) Red-team / mutation guard (MANDATORY for generator tests)
+For tests that validate generators/transformers (e.g. greentic-dev producing YGTC),
+add at least one guard that proves the test would fail for a broken output:
+
+Pick one:
+- A “known-bad” fixture (previously observed wrong output) that must fail validation, OR
+- A mutation step: corrupt the produced artifact (e.g., delete inserted node / break an edge)
+  and assert validation fails.
+
+If you cannot implement this, explain why and propose an alternative guard.
+
+### 4) Explicit pass criteria reporting (MANDATORY)
+When adding/changing tests, include in PR summary (or test comments):
+- What behavior is being validated (Given/When/Then)
+- What invariants are asserted
+- At least one example of a broken output that would now fail
+
+### 5) Integration-first validation
+Prefer using existing parsers/validators from Greentic crates (flow/schema/types)
+rather than reimplementing parsing logic in tests. If missing, add a minimal validator
+only as a last resort and document why reuse wasn’t possible.
+
+### 6) Non-goal: “make CI green”
+If a test reveals real broken behavior, do not weaken the test.
+Either:
+- fix the implementation in the same PR, OR
+- land the failing test behind an explicit TODO/ignored marker with a linked issue,
+  and explain why it cannot be fixed within scope.
+(Do NOT silently relax assertions.)
+
+---

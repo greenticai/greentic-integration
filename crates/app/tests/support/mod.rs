@@ -1,8 +1,10 @@
-use std::{fs, path::PathBuf, process::Command};
+#![allow(dead_code)]
+use std::{fs, path::PathBuf, process::Command, sync::Once};
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use serde_json::Value;
+use which::which;
 
 #[derive(Debug, Deserialize)]
 pub struct PackReference {
@@ -94,4 +96,61 @@ pub fn ensure_crane_manifest(locator: &str) -> Result<Value> {
     let json: Value =
         serde_json::from_slice(&output.stdout).context("failed to parse crane manifest output")?;
     Ok(json)
+}
+
+pub fn ensure_tool(
+    binary: &str,
+    crate_name: &str,
+    strict: bool,
+    label: &str,
+) -> Result<Option<PathBuf>> {
+    if let Ok(path) = which(binary) {
+        return Ok(Some(path));
+    }
+
+    let status = Command::new("cargo")
+        .args(["binstall", crate_name, "--no-confirm"])
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
+        .status()
+        .context(format!("failed to spawn cargo binstall for {label}"))?;
+    if status.success()
+        && let Ok(path) = which(binary)
+    {
+        return Ok(Some(path));
+    }
+
+    if strict {
+        anyhow::bail!("{label} missing and cargo binstall failed");
+    } else {
+        eprintln!(
+            "skipping {label}: {} not found and cargo binstall failed (status {:?})",
+            binary,
+            status.code()
+        );
+        Ok(None)
+    }
+}
+
+static LOG_ONCE: Once = Once::new();
+
+/// Initialize test logging for e2e runs.
+/// Respects RUST_LOG (or GT_TEST_LOG to force enable); idempotent.
+pub fn init_test_logging() {
+    LOG_ONCE.call_once(|| {
+        let enable = std::env::var("RUST_LOG").is_ok()
+            || std::env::var("GT_TEST_LOG")
+                .map(|v| v != "0")
+                .unwrap_or(false);
+        if !enable {
+            return;
+        }
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| "info".into()),
+            )
+            .with_writer(std::io::stderr)
+            .try_init();
+    });
 }

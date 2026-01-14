@@ -4,7 +4,9 @@ use std::process::Command;
 
 use anyhow::{Context, Result};
 use tempfile::tempdir;
-use which::which;
+
+#[path = "support/mod.rs"]
+mod support;
 
 /// Greentic-dev offline/local-store workflow: build component, install to local store, build/validate pack without network.
 #[test]
@@ -14,17 +16,11 @@ fn greentic_dev_offline_local_store() -> Result<()> {
         .unwrap_or(false)
         || std::env::var("CI").is_ok();
 
-    let greentic_dev = match which("greentic-dev") {
-        Ok(p) => p,
-        Err(err) => {
-            if strict {
-                return Err(err).context("greentic-dev binary not found in strict mode");
-            } else {
-                eprintln!("skipping offline greentic-dev tests: greentic-dev not found ({err})");
-                return Ok(());
-            }
-        }
-    };
+    let greentic_dev =
+        match support::ensure_tool("greentic-dev", "greentic-dev", strict, "greentic-dev")? {
+            Some(p) => p,
+            None => return Ok(()),
+        };
 
     let tmp = tempdir().context("tempdir")?;
     let work = tmp.path();
@@ -96,6 +92,12 @@ fn greentic_dev_offline_local_store() -> Result<()> {
             build_out.stderr
         );
     }
+    assert!(
+        !build_out.stderr.contains("Could not resolve host")
+            && !build_out.stderr.to_lowercase().contains("failed to get"),
+        "component build attempted network access while offline: {}",
+        build_out.stderr
+    );
     // 2) Install into local store (filesystem fetch) and ensure file exists.
     let store_wasm = store_path.join("offline_comp.wasm");
     let fetch_out = run_with_output(
@@ -132,6 +134,12 @@ fn greentic_dev_offline_local_store() -> Result<()> {
         store_wasm.exists(),
         "expected wasm in local store at {}",
         store_wasm.display()
+    );
+    assert!(
+        !fetch_out.stderr.contains("Could not resolve host")
+            && !fetch_out.stderr.to_lowercase().contains("failed to get"),
+        "component store fetch attempted network access while offline: {}",
+        fetch_out.stderr
     );
 
     // 3) Pack build using only local artifacts.

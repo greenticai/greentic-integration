@@ -87,7 +87,9 @@ impl TestEnv {
 
         env.append_log("starting compose stack")?;
         env.compose_up()?;
+        env.append_log("compose stack up; waiting for ports")?;
         env.wait_for_ports().await?;
+        env.append_log("ports ready; waiting for services")?;
         env.ensure_services_ready().await?;
         env.append_log("compose stack ready")?;
 
@@ -163,6 +165,12 @@ impl TestEnv {
     }
 
     fn run_compose(&self, args: &[&str]) -> Result<()> {
+        eprintln!(
+            "[harness] docker compose -f {} {:?} (project={})",
+            self.compose_file.display(),
+            args,
+            self.project_name
+        );
         let output = Command::new("docker")
             .arg("compose")
             .arg("-f")
@@ -174,6 +182,11 @@ impl TestEnv {
             .context("failed to execute docker compose")?;
 
         if output.status.success() {
+            eprintln!(
+                "[harness] docker compose {:?} completed (code {:?})",
+                args,
+                output.status.code()
+            );
             return Ok(());
         }
 
@@ -391,15 +404,31 @@ fn write_text(path: &Path, contents: impl AsRef<[u8]>) -> Result<()> {
 async fn wait_for_port(name: &str, port: u16, logs_dir: &Path, timeout_at: Duration) -> Result<()> {
     let start = Instant::now();
     let addr = format!("127.0.0.1:{port}");
+    let mut attempts = 0;
     loop {
         match TcpStream::connect(&addr).await {
             Ok(_) => {
                 write_probe(logs_dir, name, "port open")?;
+                eprintln!(
+                    "[harness] {name} port {} open after {:.1?} ({} attempts)",
+                    addr,
+                    start.elapsed(),
+                    attempts
+                );
                 return Ok(());
             }
             Err(err) => {
                 if start.elapsed() > timeout_at {
                     bail!("{name} did not open port {addr} in time: {err}");
+                }
+                attempts += 1;
+                if attempts % 8 == 0 {
+                    eprintln!(
+                        "[harness] waiting for {name} port {} (elapsed {:.1?}, last err: {})",
+                        addr,
+                        start.elapsed(),
+                        err
+                    );
                 }
                 sleep(Duration::from_millis(250)).await;
             }
@@ -411,6 +440,7 @@ async fn wait_for_port(name: &str, port: u16, logs_dir: &Path, timeout_at: Durat
 async fn ensure_nats_ready(url: &str, logs_dir: &Path) -> Result<()> {
     let deadline = Instant::now() + Duration::from_secs(20);
     let mut last_err: Option<anyhow::Error> = None;
+    let mut attempts = 0;
     loop {
         match async_nats::connect(url).await {
             Ok(client) => {
@@ -432,6 +462,14 @@ async fn ensure_nats_ready(url: &str, logs_dir: &Path) -> Result<()> {
             }
             return Err(anyhow::anyhow!("NATS readiness timed out"));
         }
+        attempts += 1;
+        if attempts % 5 == 0 {
+            eprintln!(
+                "[harness] waiting for NATS ready at {} (elapsed {:.1?})",
+                url,
+                attempts as f32 * 0.3
+            );
+        }
         sleep(Duration::from_millis(300)).await;
     }
 }
@@ -440,6 +478,7 @@ async fn ensure_nats_ready(url: &str, logs_dir: &Path) -> Result<()> {
 async fn ensure_postgres_ready(url: &str, logs_dir: &Path) -> Result<()> {
     let deadline = Instant::now() + Duration::from_secs(30);
     let mut last_err: Option<anyhow::Error> = None;
+    let mut attempts = 0;
     loop {
         match tokio_postgres::connect(url, NoTls).await {
             Ok((client, connection)) => {
@@ -464,6 +503,14 @@ async fn ensure_postgres_ready(url: &str, logs_dir: &Path) -> Result<()> {
                 return Err(err);
             }
             return Err(anyhow::anyhow!("postgres readiness timed out"));
+        }
+        attempts += 1;
+        if attempts % 5 == 0 {
+            eprintln!(
+                "[harness] waiting for postgres ready at {} (elapsed {:.1?})",
+                url,
+                attempts as f32 * 0.3
+            );
         }
         sleep(Duration::from_millis(300)).await;
     }

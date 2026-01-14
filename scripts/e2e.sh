@@ -46,6 +46,7 @@ tests_l1=(
   "e2e_retry_backoff_flaky_tool"
   "e2e_config_precedence"
   "e2e_pack_lifecycle"
+  "e2e_wrapper_canonical_parity"
   "pr14_provider_core_flows_and_index"
   "pr14_provider_core_schema_onboarding"
 )
