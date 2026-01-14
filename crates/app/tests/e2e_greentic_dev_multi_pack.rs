@@ -280,7 +280,7 @@ fn rewrite_flow_for_shared_component(pack_dir: &Path, comp_id: &str) -> Result<(
     let mut doc: serde_yaml_bw::Value = serde_yaml_bw::from_str(&fs::read_to_string(&flow_path)?)?;
     let mapping = doc.as_mapping_mut().context("flow yaml mapping")?;
     let nodes_value = mapping
-        .get_mut(&serde_yaml_bw::Value::from("nodes"))
+        .get_mut(serde_yaml_bw::Value::from("nodes"))
         .context("flow nodes missing")?;
     let nodes = nodes_value.as_mapping_mut().context("flow nodes mapping")?;
     let start_key = serde_yaml_bw::Value::from("start");
