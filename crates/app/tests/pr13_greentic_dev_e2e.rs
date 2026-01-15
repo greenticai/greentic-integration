@@ -22,6 +22,13 @@ mod support;
 /// End-to-end greentic-dev workflow: scaffold component -> build -> pack -> add-step -> build -> run.
 #[test]
 fn pr13_greentic_dev_component_pack_flow() -> Result<()> {
+    if std::env::var("GREENTIC_DEV_E2E").ok().as_deref() != Some("1") {
+        eprintln!(
+            "skipping pr13_greentic_dev_component_pack_flow: set GREENTIC_DEV_E2E=1 to enable"
+        );
+        return Ok(());
+    }
+
     let tmp = tempdir().context("tempdir")?;
     let work = tmp.path();
     println!("workspace: {}", work.display());

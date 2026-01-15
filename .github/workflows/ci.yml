@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Run checks
+        run: scripts/local_check.sh
+      - name: Run gtest smoke scripts
+        run: |
+          cargo run -p greentic-integration-tester -- --test tests/gtests/00_smoke_validator.gtest
+          cargo run -p greentic-integration-tester -- --test tests/gtests/01_capture_and_expect.gtest
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && secrets.CARGO_REGISTRY_TOKEN != ''
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Publish crates
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          cargo publish -p greentic-integration-core --token "$CARGO_REGISTRY_TOKEN"
+          cargo publish -p greentic-integration-validator --token "$CARGO_REGISTRY_TOKEN"
+          cargo publish -p greentic-integration-tester --token "$CARGO_REGISTRY_TOKEN"
+          cargo publish -p runner-smoke --token "$CARGO_REGISTRY_TOKEN"
+          cargo publish -p greentic-integration --token "$CARGO_REGISTRY_TOKEN"
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ${{ matrix.os }}
+    needs: check
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            ext: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ext: zip
+          - os: macos-15
+            target: aarch64-apple-darwin
+            ext: tar.gz
+          - os: macos-15
+            target: x86_64-apple-darwin
+            ext: tar.gz
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Install target
+        shell: bash
+        run: rustup target add "${{ matrix.target }}"
+      - name: Read version
+        id: version
+        shell: bash
+        run: |
+          version=$(python - <<'PY'
+          import tomllib
+          from pathlib import Path
+          data = tomllib.loads(Path("Cargo.toml").read_text())
+          print(data["workspace"]["package"]["version"])
+          PY
+          )
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - name: Build release binaries
+        shell: bash
+        run: |
+          cargo build --release --target "${{ matrix.target }}" \
+            -p greentic-integration \
+            -p greentic-integration-tester \
+            -p greentic-integration-validator \
+            -p runner-smoke
+      - name: Package artifacts (unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          target="${{ matrix.target }}"
+          bin_dir="target/${target}/release"
+          mkdir -p dist
+          package() {
+            name="$1"
+            shift
+            dir="dist/${name}-v${version}-${target}"
+            mkdir -p "$dir"
+            for bin in "$@"; do
+              cp "${bin_dir}/${bin}" "$dir/"
+            done
+            tar -czf "dist/${name}-v${version}-${target}.tar.gz" -C dist "$(basename "$dir")"
+            rm -rf "$dir"
+          }
+          package greentic-integration greentic-integration pack_audit
+          package greentic-integration-tester greentic-integration-tester
+          package greentic-integration-validator greentic-integration-validator
+          package runner-smoke runner-smoke
+      - name: Package artifacts (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $target = "${{ matrix.target }}"
+          $binDir = "target/$target/release"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          function Package($name, $bins) {
+            $dir = "dist/$name-v$version-$target"
+            New-Item -ItemType Directory -Force -Path $dir | Out-Null
+            foreach ($bin in $bins) {
+              Copy-Item "$binDir/$bin.exe" "$dir/"
+            }
+            Compress-Archive -Path "$dir/*" -DestinationPath "dist/$name-v$version-$target.zip"
+            Remove-Item -Recurse -Force $dir
+          }
+          Package "greentic-integration" @("greentic-integration","pack_audit")
+          Package "greentic-integration-tester" @("greentic-integration-tester")
+          Package "greentic-integration-validator" @("greentic-integration-validator")
+          Package "runner-smoke" @("runner-smoke")
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          files: dist/*.${{ matrix.ext }}

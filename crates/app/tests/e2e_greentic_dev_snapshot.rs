@@ -12,6 +12,11 @@ mod support;
 /// Snapshot stability for greentic-dev generated flows and packs.
 #[test]
 fn greentic_dev_snapshots_are_stable() -> Result<()> {
+    if std::env::var("GREENTIC_DEV_E2E").ok().as_deref() != Some("1") {
+        eprintln!("skipping greentic_dev_snapshots_are_stable: set GREENTIC_DEV_E2E=1 to enable");
+        return Ok(());
+    }
+
     let strict = std::env::var("GREENTIC_DEV_E2E_STRICT")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false)

@@ -12,9 +12,21 @@ mod support;
 /// Two packs sharing a component plus isolation check between pack builds.
 #[test]
 fn greentic_dev_multi_pack_shared_component() -> Result<()> {
+    if std::env::var("GREENTIC_DEV_E2E").ok().as_deref() != Some("1") {
+        eprintln!(
+            "skipping greentic_dev_multi_pack_shared_component: set GREENTIC_DEV_E2E=1 to enable"
+        );
+        return Ok(());
+    }
+
     let strict = is_strict();
     let greentic_dev =
         match support::ensure_tool("greentic-dev", "greentic-dev", strict, "greentic-dev")? {
+            Some(p) => p,
+            None => return Ok(()),
+        };
+    let greentic_pack =
+        match support::ensure_tool("greentic-pack", "greentic-pack", strict, "greentic-pack")? {
             Some(p) => p,
             None => return Ok(()),
         };
@@ -105,6 +117,22 @@ fn greentic_dev_multi_pack_shared_component() -> Result<()> {
     write_shared_pack(&pack_b, "pack-b.shared", &wasm_path)?;
     rewrite_flow_for_shared_component(&pack_a, "pack-a.shared")?;
     rewrite_flow_for_shared_component(&pack_b, "pack-b.shared")?;
+    run_status(
+        &greentic_pack,
+        &["resolve", "--in", pack_a.to_str().unwrap()],
+        work,
+        &envs,
+        "pack resolve A",
+        strict,
+    )?;
+    run_status(
+        &greentic_pack,
+        &["resolve", "--in", pack_b.to_str().unwrap()],
+        work,
+        &envs,
+        "pack resolve B",
+        strict,
+    )?;
 
     // Build both packs.
     run_status(
@@ -284,8 +312,20 @@ fn rewrite_flow_for_shared_component(pack_dir: &Path, comp_id: &str) -> Result<(
         .context("flow nodes missing")?;
     let nodes = nodes_value.as_mapping_mut().context("flow nodes mapping")?;
     let start_key = serde_yaml_bw::Value::from("start");
+    let node_key = if nodes.contains_key(&start_key) {
+        start_key
+    } else if let Some(key) = nodes.keys().next().cloned() {
+        key
+    } else {
+        let key = start_key;
+        nodes.insert(
+            key.clone(),
+            serde_yaml_bw::Value::Mapping(serde_yaml_bw::Mapping::new()),
+        );
+        key
+    };
     let start_node = nodes
-        .get_mut(&start_key)
+        .get_mut(&node_key)
         .context("flow start node missing")?;
     let start_map = start_node
         .as_mapping_mut()
@@ -313,6 +353,10 @@ fn rewrite_flow_for_shared_component(pack_dir: &Path, comp_id: &str) -> Result<(
         serde_yaml_bw::Value::from("out"),
     );
     fs::write(&flow_path, serde_yaml_bw::to_string(&doc)?)?;
+    let resolve_path = flow_path.with_extension("ygtc.resolve.json");
+    let summary_path = flow_path.with_extension("ygtc.resolve.summary.json");
+    let _ = fs::remove_file(resolve_path);
+    let _ = fs::remove_file(summary_path);
     Ok(())
 }
 

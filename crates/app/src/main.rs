@@ -2,7 +2,7 @@ mod deployment;
 mod path_safety;
 mod session;
 
-use std::{fs, net::SocketAddr, process::Command as ProcessCommand, sync::Arc};
+use std::{fs, net::SocketAddr, path::PathBuf, process::Command as ProcessCommand, sync::Arc};
 
 use anyhow::{Context, Result, anyhow, bail};
 use axum::{
@@ -12,7 +12,7 @@ use axum::{
     routing::{get, post},
 };
 use camino::{Utf8Path, Utf8PathBuf};
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use directories::ProjectDirs;
 use figment::{
     Figment,
@@ -28,6 +28,7 @@ use std::time::Duration;
 use tokio::{net::TcpListener, signal, sync::mpsc, task::JoinSet};
 use tracing::{error, info, trace, warn};
 use uuid::Uuid;
+use which::which;
 
 use crate::deployment::{
     ChannelPlan, DeploymentPlan, MessagingPlan, MessagingSubjectPlan, RunnerPlan, TelemetryPlan,
@@ -71,6 +72,8 @@ enum Command {
         #[command(subcommand)]
         command: RunnerCommandCli,
     },
+    /// Run .gtest scripts via greentic-integration-tester
+    Gtest(GtestArgs),
 }
 
 #[derive(Args, Debug)]
@@ -103,6 +106,43 @@ struct PackListArgs {
     team: Option<String>,
     #[arg(long)]
     user: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct GtestArgs {
+    /// Path to the .gtest script or directory
+    #[arg(long, value_name = "PATH")]
+    test: PathBuf,
+    /// Working directory for command execution
+    #[arg(long, value_name = "PATH")]
+    workdir: Option<PathBuf>,
+    /// Keep the working directory on success
+    #[arg(long)]
+    keep_workdir: bool,
+    /// Repository root for built-in substitutions
+    #[arg(long, value_name = "PATH")]
+    repo_root: Option<PathBuf>,
+    /// Prepend PATH entries for spawned commands
+    #[arg(long, value_name = "PATHS")]
+    prepend_path: Option<String>,
+    /// Stop scheduling new tests after the first failure
+    #[arg(long)]
+    fail_fast: bool,
+    /// Number of tests to run in parallel
+    #[arg(long, value_name = "N", default_value_t = 1)]
+    concurrency: usize,
+    /// Report format
+    #[arg(long, value_enum, default_value_t = GtestReportFormat::Text)]
+    report: GtestReportFormat,
+    /// Write report output to a file
+    #[arg(long, value_name = "PATH")]
+    report_file: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum GtestReportFormat {
+    Text,
+    Json,
 }
 
 #[derive(Subcommand, Debug)]
@@ -509,9 +549,69 @@ async fn main() -> Result<()> {
         Command::Packs { command } => handle_packs(command)?,
         Command::Sessions { command } => handle_sessions(command)?,
         Command::Runner { command } => handle_runner(command)?,
+        Command::Gtest(args) => handle_gtest(args)?,
     }
 
     Ok(())
+}
+
+fn handle_gtest(args: GtestArgs) -> Result<()> {
+    let tester = which("greentic-integration-tester")
+        .or_else(|_| find_local_gtest_runner())
+        .context("greentic-integration-tester not found on PATH or next to greentic-integration")?;
+    let mut cmd = ProcessCommand::new(tester);
+    cmd.arg("--test").arg(args.test);
+    if let Some(workdir) = args.workdir {
+        cmd.arg("--workdir").arg(workdir);
+    }
+    if args.keep_workdir {
+        cmd.arg("--keep-workdir");
+    }
+    if let Some(repo_root) = args.repo_root {
+        cmd.arg("--repo-root").arg(repo_root);
+    }
+    if let Some(prepend_path) = args.prepend_path {
+        cmd.arg("--prepend-path").arg(prepend_path);
+    }
+    if args.fail_fast {
+        cmd.arg("--fail-fast");
+    }
+    cmd.arg("--concurrency")
+        .arg(args.concurrency.to_string());
+    match args.report {
+        GtestReportFormat::Text => {
+            cmd.arg("--report").arg("text");
+        }
+        GtestReportFormat::Json => {
+            cmd.arg("--report").arg("json");
+        }
+    }
+    if let Some(report_file) = args.report_file {
+        cmd.arg("--report-file").arg(report_file);
+    }
+    let status = cmd.status().context("failed to spawn greentic-integration-tester")?;
+    if !status.success() {
+        bail!("gtest runner failed with status {:?}", status.code());
+    }
+    Ok(())
+}
+
+fn find_local_gtest_runner() -> Result<std::path::PathBuf> {
+    let exe = std::env::current_exe().context("failed to resolve current executable path")?;
+    let exe_dir = exe
+        .parent()
+        .context("current executable has no parent directory")?;
+    let mut candidate = exe_dir.join("greentic-integration-tester");
+    if cfg!(windows) {
+        candidate.set_extension("exe");
+    }
+    if candidate.exists() {
+        return Ok(candidate);
+    }
+    Err(anyhow!(
+        "greentic-integration-tester not found near {}",
+        exe_dir.display()
+    ))
 }
 
 async fn serve(args: ServeArgs) -> Result<()> {

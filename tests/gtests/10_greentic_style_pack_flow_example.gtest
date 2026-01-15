@@ -1,0 +1,7 @@
+@skip requires greentic CLI binaries on PATH
+
+# Example template for a greentic flow validation run.
+# Enable by removing the @skip directive and ensuring greentic binaries are available.
+
+greentic-pack --help
+greentic-runner-cli --help

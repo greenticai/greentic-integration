@@ -1,0 +1,11 @@
+[package]
+name = "state_writer_component"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+greentic-interfaces-guest = { workspace = true, default-features = false, features = ["component-node", "state-store"] }
+serde_json = { workspace = true }

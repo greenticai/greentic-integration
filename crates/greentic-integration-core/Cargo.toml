@@ -1,5 +1,5 @@
 [package]
-name = "runner-smoke"
+name = "greentic-integration-core"
 version.workspace = true
 edition.workspace = true
 description.workspace = true
@@ -7,7 +7,5 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-anyhow.workspace = true
 serde.workspace = true
-serde_json.workspace = true
-walkdir.workspace = true
+thiserror.workspace = true

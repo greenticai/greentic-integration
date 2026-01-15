@@ -1,5 +1,5 @@
 [package]
-name = "runner-smoke"
+name = "greentic-integration-tester"
 version.workspace = true
 edition.workspace = true
 description.workspace = true
@@ -8,6 +8,11 @@ repository.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-serde.workspace = true
+clap.workspace = true
+greentic-integration-core.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+tempfile.workspace = true
+wait-timeout = "0.2"
 walkdir.workspace = true
+rayon = "1.10"

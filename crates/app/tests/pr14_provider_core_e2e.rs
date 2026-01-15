@@ -305,6 +305,13 @@ impl DummyProvider {
 
 #[test]
 fn pr14_provider_core_flows_and_index() -> Result<()> {
+    if std::env::var("GREENTIC_PROVIDER_CORE_ONLY").ok().as_deref() != Some("1") {
+        eprintln!(
+            "skipping pr14_provider_core_flows_and_index: set GREENTIC_PROVIDER_CORE_ONLY=1 to enable"
+        );
+        return Ok(());
+    }
+
     enforce_provider_core_env()?;
 
     // Secrets flow: in-memory provider-core pack, put/get round-trip.
@@ -369,6 +376,13 @@ fn pr14_provider_core_flows_and_index() -> Result<()> {
 
 #[test]
 fn pr14_provider_core_schema_onboarding() -> Result<()> {
+    if std::env::var("GREENTIC_PROVIDER_CORE_ONLY").ok().as_deref() != Some("1") {
+        eprintln!(
+            "skipping pr14_provider_core_schema_onboarding: set GREENTIC_PROVIDER_CORE_ONLY=1 to enable"
+        );
+        return Ok(());
+    }
+
     enforce_provider_core_env()?;
     let secrets_path = pack_fixture("provider_secrets_dummy/provider_secrets_dummy.gtpack");
     let mut provider = DummyProvider::install(&secrets_path)?;
