@@ -22,6 +22,7 @@ use zip::ZipArchive;
 #[derive(Clone, Debug)]
 struct Config {
     org: String,
+    owner_type: OwnerType,
     mode: Mode,
     limit: Option<usize>,
     include: Option<Regex>,
@@ -32,6 +33,12 @@ struct Config {
     auto_login: bool,
     crane_bin: String,
     output_dir: PathBuf,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OwnerType {
+    Org,
+    User,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -173,6 +180,14 @@ fn main() -> Result<()> {
 impl Config {
     fn from_env() -> Result<Self> {
         let org = env::var("GT_PACKS_ORG").unwrap_or_else(|_| "greentic-ai".to_string());
+        let owner_type = match env::var("GT_PACKS_OWNER_TYPE")
+            .unwrap_or_else(|_| "org".to_string())
+            .as_str()
+        {
+            "org" => OwnerType::Org,
+            "user" => OwnerType::User,
+            other => anyhow::bail!("unsupported GT_PACKS_OWNER_TYPE '{}'", other),
+        };
         let mode = match env::var("GT_PACKS_MODE")
             .unwrap_or_else(|_| "latest".to_string())
             .as_str()
@@ -208,6 +223,7 @@ impl Config {
 
         Ok(Self {
             org,
+            owner_type,
             mode,
             limit,
             include,
@@ -227,6 +243,15 @@ impl Mode {
         match self {
             Mode::Latest => "latest",
             Mode::All => "all",
+        }
+    }
+}
+
+impl OwnerType {
+    fn api_segment(&self) -> &'static str {
+        match self {
+            OwnerType::Org => "orgs",
+            OwnerType::User => "users",
         }
     }
 }
@@ -257,8 +282,10 @@ fn fetch_packages(agent: &ureq::Agent, cfg: &Config) -> Result<Vec<GithubPackage
     let mut packages = Vec::new();
     loop {
         let url = format!(
-            "https://api.github.com/orgs/{}/packages?package_type=container&per_page=100&page={}",
-            cfg.org, page
+            "https://api.github.com/{}/{}/packages?package_type=container&per_page=100&page={}",
+            cfg.owner_type.api_segment(),
+            cfg.org,
+            page
         );
         let resp = agent
             .get(&url)
@@ -359,8 +386,11 @@ fn fetch_versions(
     let mut page = 1;
     loop {
         let url = format!(
-            "https://api.github.com/orgs/{}/packages/container/{}/versions?per_page=100&page={}",
-            cfg.org, package, page
+            "https://api.github.com/{}/{}/packages/container/{}/versions?per_page=100&page={}",
+            cfg.owner_type.api_segment(),
+            cfg.org,
+            package,
+            page
         );
         let resp = agent
             .get(&url)
