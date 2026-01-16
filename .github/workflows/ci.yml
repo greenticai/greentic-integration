@@ -22,6 +22,10 @@ jobs:
         run: |
           cargo install cargo-binstall --locked
           cargo binstall greentic-dev --no-confirm
+      - name: Install crane
+        run: |
+          curl -sL https://github.com/google/go-containerregistry/releases/download/v0.20.3/crane-linux-amd64 -o /usr/local/bin/crane
+          chmod +x /usr/local/bin/crane
       - name: Install wasm targets
         run: rustup target add wasm32-wasip2
       - name: Run checks

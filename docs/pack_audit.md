@@ -6,10 +6,7 @@ This audit downloads published packs from GHCR, decodes their `.gtpack` manifest
 
 ```bash
 GITHUB_TOKEN=ghp_xxx \
-GITHUB_ACTOR=your-user \
-# optional: login first if packs are private
-echo "$GITHUB_TOKEN" | crane auth login ghcr.io -u "${GITHUB_ACTOR:-oauth2}" --password-stdin
-
+GITHUB_ORG=greentic-ai \ # or GITHUB_USER=your-user
 GT_PACKS_MODE=latest \ # or all
 GT_PACKS_LIMIT=10 \    # optional
 RUST_LOG=info \
@@ -22,7 +19,6 @@ Optional filters:
 - `GT_PACKS_INCLUDE_REGEX` / `GT_PACKS_EXCLUDE_REGEX`
 - `GT_PACKS_ORG` (default `greentic-ai`)
 - `GT_PACK_AUDIT_DIR` to change output directory
-- `CRANE_BIN` to point at a custom `crane`
 
 ## What the tests enforce
 - Each audited entry must decode `manifest.cbor`.

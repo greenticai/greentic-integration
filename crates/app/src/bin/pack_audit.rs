@@ -1,23 +1,31 @@
 use std::{
     env, fs,
-    io::{Read, Write},
-    path::{Path, PathBuf},
-    process::Command,
+    io::{Cursor, Read},
+    path::PathBuf,
     time::SystemTime,
 };
 
 use anyhow::{Context, Result, anyhow};
+use async_trait::async_trait;
+use flate2::read::GzDecoder;
+use greentic_distributor_client::oci_packs::{PulledImage, PulledLayer, RegistryClient};
+use greentic_distributor_client::{OciPackFetcher, PackFetchOptions};
 use greentic_types::{
     cbor::decode_pack_manifest,
     flow::FlowKind,
     pack_manifest::{PackKind, PackManifest},
     provider::{PROVIDER_EXTENSION_ID, ProviderRuntimeRef},
 };
+use oci_distribution::Reference;
+use oci_distribution::client::{Client, ClientConfig, ClientProtocol, ImageData};
+use oci_distribution::errors::OciDistributionError;
+use oci_distribution::secrets::RegistryAuth;
 use regex::Regex;
 use serde::Serialize;
-use tempfile::tempdir_in;
-use walkdir::WalkDir;
+use serde_yaml_bw::{Mapping, Value as YamlValue};
+use tar::Archive;
 use zip::ZipArchive;
+use zstd::stream::read::Decoder as ZstdDecoder;
 
 #[derive(Clone, Debug)]
 struct Config {
@@ -28,10 +36,7 @@ struct Config {
     include: Option<Regex>,
     exclude: Option<Regex>,
     github_token: String,
-    ghcr_token: String,
-    github_actor: String,
-    auto_login: bool,
-    crane_bin: String,
+    ghcr_username: String,
     output_dir: PathBuf,
 }
 
@@ -126,23 +131,28 @@ fn main() -> Result<()> {
     let packages = fetch_packages(&agent, &cfg)?;
     let targets = collect_targets(&agent, &cfg, &packages)?;
 
-    ensure_crane_available(&cfg)?;
-
     if targets.is_empty() {
         println!("no packages selected; check filters");
         return Ok(());
     }
 
-    if cfg.auto_login {
-        login_crane(&cfg)?;
-    }
-
-    preflight_auth(&cfg, &targets[0].oci_ref())?;
+    let pack_opts = PackFetchOptions {
+        allow_tags: true,
+        ..PackFetchOptions::default()
+    };
+    let pack_fetcher = OciPackFetcher::with_client(
+        GhcrRegistryClient::new(&cfg.github_token, &cfg.ghcr_username),
+        pack_opts,
+    );
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .context("failed to initialize async runtime")?;
 
     let mut entries = Vec::new();
     for target in targets {
         entries.push(
-            audit_single(&cfg, &target).unwrap_or_else(|err| AuditEntry {
+            audit_single(&pack_fetcher, &runtime, &target).unwrap_or_else(|err| AuditEntry {
                 package: target.package.clone(),
                 tag: target.tag.clone(),
                 oci_ref: target.oci_ref(),
@@ -177,16 +187,88 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+#[derive(Clone)]
+struct GhcrRegistryClient {
+    inner: Client,
+    auth: RegistryAuth,
+}
+
+impl GhcrRegistryClient {
+    fn new(token: &str, username: &str) -> Self {
+        let config = ClientConfig {
+            protocol: ClientProtocol::Https,
+            ..Default::default()
+        };
+        let auth = if token.trim().is_empty() {
+            RegistryAuth::Anonymous
+        } else {
+            RegistryAuth::Basic(username.to_string(), token.to_string())
+        };
+        Self {
+            inner: Client::new(config),
+            auth,
+        }
+    }
+}
+
+#[async_trait]
+impl RegistryClient for GhcrRegistryClient {
+    fn default_client() -> Self {
+        let config = ClientConfig {
+            protocol: ClientProtocol::Https,
+            ..Default::default()
+        };
+        Self {
+            inner: Client::new(config),
+            auth: RegistryAuth::Anonymous,
+        }
+    }
+
+    async fn pull(
+        &self,
+        reference: &Reference,
+        accepted_manifest_types: &[&str],
+    ) -> Result<PulledImage, OciDistributionError> {
+        let image = self
+            .inner
+            .pull(reference, &self.auth, accepted_manifest_types.to_vec())
+            .await?;
+        Ok(convert_image(image))
+    }
+}
+
+fn convert_image(image: ImageData) -> PulledImage {
+    let layers = image
+        .layers
+        .into_iter()
+        .map(|layer| {
+            let digest = format!("sha256:{}", layer.sha256_digest());
+            PulledLayer {
+                media_type: layer.media_type,
+                data: layer.data,
+                digest: Some(digest),
+            }
+        })
+        .collect();
+    PulledImage {
+        digest: image.digest,
+        layers,
+    }
+}
+
 impl Config {
     fn from_env() -> Result<Self> {
-        let org = env::var("GT_PACKS_ORG").unwrap_or_else(|_| "greentic-ai".to_string());
-        let owner_type = match env::var("GT_PACKS_OWNER_TYPE")
-            .unwrap_or_else(|_| "org".to_string())
-            .as_str()
-        {
-            "org" => OwnerType::Org,
-            "user" => OwnerType::User,
-            other => anyhow::bail!("unsupported GT_PACKS_OWNER_TYPE '{}'", other),
+        let github_user = env_nonempty("GITHUB_USER")?;
+        let github_org = env_nonempty("GITHUB_ORG")?;
+        let (owner_type, org, owner_user) = match (github_user, github_org) {
+            (Some(_), Some(_)) => {
+                anyhow::bail!("set only one of GITHUB_USER or GITHUB_ORG");
+            }
+            (Some(user), None) => (OwnerType::User, user.clone(), Some(user)),
+            (None, Some(org)) => (OwnerType::Org, org, None),
+            (None, None) => {
+                anyhow::bail!("missing required env var: set GITHUB_USER or GITHUB_ORG");
+            }
         };
         let mode = match env::var("GT_PACKS_MODE")
             .unwrap_or_else(|_| "latest".to_string())
@@ -203,14 +285,12 @@ impl Config {
         let exclude = env::var("GT_PACKS_EXCLUDE_REGEX")
             .ok()
             .and_then(|v| Regex::new(&v).ok());
-        let github_token = env::var("GITHUB_TOKEN")
-            .context("GITHUB_TOKEN is required to list/pull packages from GHCR")?;
-        let ghcr_token = env::var("GHCR_TOKEN").unwrap_or_else(|_| github_token.clone());
-        let github_actor = env::var("GITHUB_ACTOR").unwrap_or_else(|_| "oauth2".to_string());
-        let auto_login = env::var("GT_CRANE_LOGIN")
-            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-            .unwrap_or(false);
-        let crane_bin = env::var("CRANE_BIN").unwrap_or_else(|_| "crane".to_string());
+        let github_token = require_env_nonempty("GITHUB_TOKEN")?;
+        let ghcr_username = if let Some(user) = owner_user {
+            user
+        } else {
+            env_nonempty("GITHUB_ACTOR")?.unwrap_or_else(|| "oauth2".to_string())
+        };
         let output_dir = env::var("GT_PACK_AUDIT_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| {
@@ -229,12 +309,28 @@ impl Config {
             include,
             exclude,
             github_token,
-            ghcr_token,
-            github_actor,
-            auto_login,
-            crane_bin,
+            ghcr_username,
             output_dir,
         })
+    }
+}
+
+fn env_nonempty(name: &str) -> Result<Option<String>> {
+    match env::var(name) {
+        Ok(value) => {
+            if value.trim().is_empty() {
+                anyhow::bail!("{name} is set but empty; set it to a non-empty value");
+            }
+            Ok(Some(value))
+        }
+        Err(_) => Ok(None),
+    }
+}
+
+fn require_env_nonempty(name: &str) -> Result<String> {
+    match env_nonempty(name)? {
+        Some(value) => Ok(value),
+        None => anyhow::bail!("missing required env var: {name}"),
     }
 }
 
@@ -384,12 +480,13 @@ fn fetch_versions(
 ) -> Result<Vec<GithubPackageVersion>> {
     let mut versions = Vec::new();
     let mut page = 1;
+    let encoded_package = urlencoding::encode(package);
     loop {
         let url = format!(
             "https://api.github.com/{}/{}/packages/container/{}/versions?per_page=100&page={}",
             cfg.owner_type.api_segment(),
             cfg.org,
-            package,
+            encoded_package,
             page
         );
         let resp = agent
@@ -413,86 +510,23 @@ fn fetch_versions(
     Ok(versions)
 }
 
-fn ensure_crane_available(cfg: &Config) -> Result<()> {
-    let status = Command::new(&cfg.crane_bin)
-        .arg("--version")
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status();
-    match status {
-        Ok(status) if status.success() => Ok(()),
-        _ => anyhow::bail!(
-            "crane not found or not executable. Install crane (https://github.com/google/go-containerregistry) and ensure it is on PATH."
-        ),
-    }
-}
-
-fn login_crane(cfg: &Config) -> Result<()> {
-    let status = Command::new(&cfg.crane_bin)
-        .args([
-            "auth",
-            "login",
-            "ghcr.io",
-            "--username",
-            &cfg.github_actor,
-            "--password-stdin",
-        ])
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .and_then(|mut child| {
-            if let Some(stdin) = child.stdin.as_mut() {
-                stdin.write_all(cfg.ghcr_token.as_bytes())?;
-            }
-            child.wait()
-        })
-        .map_err(|err| anyhow!("failed to run crane auth login: {err}"))?;
-    if !status.success() {
-        anyhow::bail!(
-            "crane auth login exited with {status:?}. Tried username '{}' with provided token.",
-            cfg.github_actor
-        );
-    }
-    Ok(())
-}
-
-fn preflight_auth(cfg: &Config, sample_ref: &str) -> Result<()> {
-    let mut cmd = Command::new(&cfg.crane_bin);
-    cmd.args(["manifest", sample_ref]);
-    if let Ok(cfg_path) = env::var("DOCKER_CONFIG") {
-        cmd.env("DOCKER_CONFIG", cfg_path);
-    }
-    cmd.env("GITHUB_TOKEN", &cfg.ghcr_token);
-    let output = cmd
-        .output()
-        .with_context(|| format!("failed to run crane manifest for {sample_ref}"))?;
-    if output.status.success() {
-        return Ok(());
-    }
-
-    let suggestion = "crane is not authenticated to ghcr.io (or token lacks packages:read).\n\
-         Remediation:\n  echo \"${GITHUB_TOKEN}\" | crane auth login ghcr.io -u \"${GITHUB_ACTOR:-oauth2}\" --password-stdin\n\
-         Ensure GitHub Actions permissions include: packages: read"
-        .to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    anyhow::bail!(
-        "crane manifest {sample_ref} failed (status {:?}): {}\n{}",
-        output.status.code(),
-        stderr,
-        suggestion
-    );
-}
-
-fn audit_single(cfg: &Config, target: &AuditTarget) -> Result<AuditEntry> {
+fn audit_single<C: RegistryClient>(
+    fetcher: &OciPackFetcher<C>,
+    runtime: &tokio::runtime::Runtime,
+    target: &AuditTarget,
+) -> Result<AuditEntry> {
     let oci_ref = target.oci_ref();
-    let tmp = tempdir_in(&cfg.output_dir)?;
-    run_crane_export(&cfg.crane_bin, &cfg.ghcr_token, &oci_ref, tmp.path())?;
-    let manifest_bytes = extract_manifest_bytes(tmp.path())
-        .with_context(|| format!("failed to extract manifest from {}", oci_ref))?;
-    let manifest =
-        decode_pack_manifest(&manifest_bytes).with_context(|| format!("decode {}", oci_ref))?;
-    let summary = summarize_manifest(&manifest, target);
+    let resolved = runtime
+        .block_on(fetcher.fetch_pack_to_cache(&oci_ref))
+        .map_err(|err| anyhow!("failed to fetch pack {oci_ref}: {err}"))?;
+    let pack_bytes = fs::read(&resolved.path)
+        .with_context(|| format!("failed to read cached pack {}", resolved.path.display()))?;
+    let summary = summarize_pack_bytes(&pack_bytes, target).with_context(|| {
+        format!(
+            "failed to extract manifest from {} (media type {})",
+            oci_ref, resolved.media_type
+        )
+    })?;
     Ok(AuditEntry {
         package: target.package.clone(),
         tag: target.tag.clone(),
@@ -502,55 +536,124 @@ fn audit_single(cfg: &Config, target: &AuditTarget) -> Result<AuditEntry> {
     })
 }
 
-fn run_crane_export(crane_bin: &str, token: &str, oci_ref: &str, out_dir: &Path) -> Result<()> {
-    let mut cmd = Command::new(crane_bin);
-    cmd.args(["export", oci_ref, out_dir.to_str().unwrap()]);
-    if let Ok(cfg) = env::var("DOCKER_CONFIG") {
-        cmd.env("DOCKER_CONFIG", cfg);
+fn summarize_pack_bytes(pack_bytes: &[u8], target: &AuditTarget) -> Result<ManifestSummary> {
+    if let Some(manifest_bytes) = extract_manifest_bytes(pack_bytes)? {
+        let manifest = decode_pack_manifest(&manifest_bytes).context("decode manifest.cbor")?;
+        return Ok(summarize_manifest(&manifest, target));
     }
-    cmd.env("GITHUB_TOKEN", token);
-    let status = cmd
-        .status()
-        .with_context(|| format!("failed to spawn crane for {}", oci_ref))?;
-    if !status.success() {
-        anyhow::bail!("crane export failed for {}: {status:?}", oci_ref);
+    if let Some(yaml_bytes) = extract_gtpack_yaml(pack_bytes)? {
+        return summarize_gtpack_yaml(&yaml_bytes, target);
     }
-    Ok(())
+    Err(anyhow!(
+        "manifest.cbor or gtpack.yaml not found in pack payload"
+    ))
 }
 
-fn extract_manifest_bytes(root: &Path) -> Result<Vec<u8>> {
-    // Prefer .gtpack artifacts.
-    for entry in WalkDir::new(root).into_iter().filter_map(Result::ok) {
-        if entry.path().extension().and_then(|e| e.to_str()) == Some("gtpack") {
-            let file = fs::File::open(entry.path())
-                .with_context(|| format!("failed to open {}", entry.path().display()))?;
-            let mut archive = ZipArchive::new(file)
-                .with_context(|| format!("failed to read zip {}", entry.path().display()))?;
-            for i in 0..archive.len() {
-                let mut f = archive.by_index(i)?;
-                if f.name().ends_with("manifest.cbor") {
-                    let mut buf = Vec::new();
-                    f.read_to_end(&mut buf)?;
-                    return Ok(buf);
-                }
+fn extract_manifest_bytes(pack_bytes: &[u8]) -> Result<Option<Vec<u8>>> {
+    if let Ok(mut zip) = ZipArchive::new(Cursor::new(pack_bytes)) {
+        if let Some(found) = read_zip_member_bytes(&mut zip, "manifest.cbor") {
+            return Ok(Some(found));
+        }
+        if let Some(nested) = read_zip_nested_suffix(&mut zip, "manifest.cbor")? {
+            return Ok(Some(nested));
+        }
+        return Ok(None);
+    }
+
+    let tar_bytes = maybe_decompress_tar_bytes(pack_bytes)?;
+    let mut archive = Archive::new(Cursor::new(tar_bytes));
+    let mut fallback_manifest: Option<Vec<u8>> = None;
+
+    let entries = archive
+        .entries()
+        .context("reading tar entries for pack payload")?;
+    for entry in entries {
+        let mut entry = entry.context("reading tar entry in pack payload")?;
+        let path = entry
+            .path()
+            .context("reading tar entry path in pack payload")?
+            .into_owned();
+        let path_str = path.to_string_lossy().to_string();
+        if path_str.ends_with(".gtpack") {
+            let mut buf = Vec::new();
+            entry.read_to_end(&mut buf)?;
+            let mut zip = ZipArchive::new(Cursor::new(buf))
+                .with_context(|| format!("failed to read zip {}", path_str))?;
+            if let Some(found) = read_zip_member_bytes(&mut zip, "manifest.cbor") {
+                return Ok(Some(found));
             }
+        } else if path_str.ends_with("manifest.cbor") {
+            let mut buf = Vec::new();
+            entry.read_to_end(&mut buf)?;
+            fallback_manifest = Some(buf);
         }
     }
 
-    // Fallback to raw manifest.cbor.
-    for entry in WalkDir::new(root).into_iter().filter_map(Result::ok) {
-        if entry
-            .file_name()
-            .to_str()
-            .map(|n| n == "manifest.cbor")
-            .unwrap_or(false)
-        {
-            return fs::read(entry.path())
-                .with_context(|| format!("failed to read {}", entry.path().display()));
+    Ok(fallback_manifest)
+}
+
+fn extract_gtpack_yaml(pack_bytes: &[u8]) -> Result<Option<Vec<u8>>> {
+    if let Ok(mut zip) = ZipArchive::new(Cursor::new(pack_bytes)) {
+        if let Some(found) = read_zip_member_bytes(&mut zip, "gtpack.yaml") {
+            return Ok(Some(found));
+        }
+        if let Some(nested) = read_zip_nested_suffix(&mut zip, "gtpack.yaml")? {
+            return Ok(Some(nested));
+        }
+        return Ok(None);
+    }
+
+    let tar_bytes = maybe_decompress_tar_bytes(pack_bytes)?;
+    let mut archive = Archive::new(Cursor::new(tar_bytes));
+    let mut yaml_bytes: Option<Vec<u8>> = None;
+
+    let entries = archive
+        .entries()
+        .context("reading tar entries for pack payload")?;
+    for entry in entries {
+        let mut entry = entry.context("reading tar entry in pack payload")?;
+        let path = entry
+            .path()
+            .context("reading tar entry path in pack payload")?
+            .into_owned();
+        let path_str = path.to_string_lossy().to_string();
+        if path_str.ends_with(".gtpack") {
+            let mut buf = Vec::new();
+            entry.read_to_end(&mut buf)?;
+            let mut zip = ZipArchive::new(Cursor::new(buf))
+                .with_context(|| format!("failed to read zip {}", path_str))?;
+            if let Some(found) = read_zip_member_bytes(&mut zip, "gtpack.yaml") {
+                return Ok(Some(found));
+            }
+        } else if path_str.ends_with("gtpack.yaml") {
+            let mut buf = Vec::new();
+            entry.read_to_end(&mut buf)?;
+            yaml_bytes = Some(buf);
         }
     }
 
-    Err(anyhow!("manifest.cbor not found under {}", root.display()))
+    Ok(yaml_bytes)
+}
+
+fn maybe_decompress_tar_bytes(pack_bytes: &[u8]) -> Result<Vec<u8>> {
+    if pack_bytes.starts_with(&[0x1f, 0x8b]) {
+        let mut decoder = GzDecoder::new(pack_bytes);
+        let mut buf = Vec::new();
+        decoder
+            .read_to_end(&mut buf)
+            .context("failed to decompress gzip pack payload")?;
+        return Ok(buf);
+    }
+    if pack_bytes.starts_with(&[0x28, 0xb5, 0x2f, 0xfd]) {
+        let mut decoder = ZstdDecoder::new(pack_bytes)
+            .context("failed to initialize zstd decoder for pack payload")?;
+        let mut buf = Vec::new();
+        decoder
+            .read_to_end(&mut buf)
+            .context("failed to decompress zstd pack payload")?;
+        return Ok(buf);
+    }
+    Ok(pack_bytes.to_vec())
 }
 
 fn summarize_manifest(manifest: &PackManifest, target: &AuditTarget) -> ManifestSummary {
@@ -603,6 +706,48 @@ fn summarize_manifest(manifest: &PackManifest, target: &AuditTarget) -> Manifest
     }
 }
 
+fn summarize_gtpack_yaml(yaml_bytes: &[u8], target: &AuditTarget) -> Result<ManifestSummary> {
+    let doc: YamlValue = serde_yaml_bw::from_slice(yaml_bytes).context("parse gtpack.yaml")?;
+    let pack_id = yaml_str(&doc, "id").ok_or_else(|| anyhow!("gtpack.yaml missing id"))?;
+    let version = yaml_str(&doc, "version").unwrap_or("unknown").to_string();
+    let schema_version = yaml_str(&doc, "schema_version")
+        .unwrap_or("pack-v1")
+        .to_string();
+    let kind = yaml_str(&doc, "kind").unwrap_or("application").to_string();
+    let components = yaml_sequence_len(&doc, "components");
+    let supports = Vec::new();
+    let extensions = yaml_map_keys(&doc, "extensions");
+    let mut providers = yaml_provider_summaries(&doc);
+    let default_config_schema = yaml_mapping(&doc)
+        .and_then(|map| yaml_mapping_get_str(map, "schemas"))
+        .and_then(YamlValue::as_mapping)
+        .and_then(|map| yaml_mapping_get_str(map, "config"))
+        .and_then(YamlValue::as_str)
+        .map(|value| value.to_string());
+    if let Some(config_schema_ref) = default_config_schema {
+        for provider in &mut providers {
+            if provider.config_schema_ref.is_none() {
+                provider.config_schema_ref = Some(config_schema_ref.clone());
+            }
+        }
+    }
+    let categories = classify_from_fields(&kind, pack_id, target, &supports);
+
+    Ok(ManifestSummary {
+        pack_id: pack_id.to_string(),
+        version,
+        schema_version,
+        kind,
+        components,
+        supports,
+        extensions: extensions.clone(),
+        categories,
+        provider_count: providers.len(),
+        providers,
+        has_provider_extension: extensions.iter().any(|ext| ext == PROVIDER_EXTENSION_ID),
+    })
+}
+
 impl From<&ProviderRuntimeRef> for ProviderRuntimeSummary {
     fn from(value: &ProviderRuntimeRef) -> Self {
         Self {
@@ -614,6 +759,20 @@ impl From<&ProviderRuntimeRef> for ProviderRuntimeSummary {
 }
 
 fn classify(manifest: &PackManifest, target: &AuditTarget, supports: &[String]) -> Vec<String> {
+    classify_from_fields(
+        pack_kind_str(manifest.kind),
+        manifest.pack_id.as_ref(),
+        target,
+        supports,
+    )
+}
+
+fn classify_from_fields(
+    kind: &str,
+    pack_id: &str,
+    target: &AuditTarget,
+    supports: &[String],
+) -> Vec<String> {
     let mut categories = Vec::new();
     if supports.iter().any(|s| s == "messaging") {
         categories.push("messaging".to_string());
@@ -621,15 +780,164 @@ fn classify(manifest: &PackManifest, target: &AuditTarget, supports: &[String]) 
     if supports.iter().any(|s| s == "event") {
         categories.push("events".to_string());
     }
-    if manifest.kind == PackKind::Provider
-        && (manifest.pack_id.to_string().contains("secret") || target.package.contains("secret"))
-    {
+    if kind == "provider" && (pack_id.contains("secret") || target.package.contains("secret")) {
         categories.push("secrets".to_string());
     }
     if categories.is_empty() {
         categories.push("other".to_string());
     }
     categories
+}
+
+fn yaml_str<'a>(doc: &'a YamlValue, key: &str) -> Option<&'a str> {
+    yaml_mapping(doc)
+        .and_then(|map| yaml_mapping_get_str(map, key))
+        .and_then(YamlValue::as_str)
+}
+
+fn yaml_sequence_len(doc: &YamlValue, key: &str) -> usize {
+    yaml_mapping(doc)
+        .and_then(|map| yaml_mapping_get_str(map, key))
+        .and_then(YamlValue::as_sequence)
+        .map(|seq| seq.iter().count())
+        .unwrap_or(0)
+}
+
+fn yaml_map_keys(doc: &YamlValue, key: &str) -> Vec<String> {
+    let mut keys = Vec::new();
+    let Some(map) = yaml_mapping(doc)
+        .and_then(|map| yaml_mapping_get_str(map, key))
+        .and_then(YamlValue::as_mapping)
+    else {
+        return keys;
+    };
+
+    for (k, _) in map {
+        if let YamlValue::String(value, _) = k {
+            keys.push(value.clone());
+        }
+    }
+    keys
+}
+
+fn yaml_provider_summaries(doc: &YamlValue) -> Vec<ProviderSummary> {
+    let Some(extensions) = yaml_mapping(doc)
+        .and_then(|map| yaml_mapping_get_str(map, "extensions"))
+        .and_then(YamlValue::as_mapping)
+    else {
+        return Vec::new();
+    };
+    let Some(provider_ext) = yaml_mapping_get_str(extensions, PROVIDER_EXTENSION_ID) else {
+        return Vec::new();
+    };
+
+    if let Some(provider) =
+        yaml_mapping(provider_ext).and_then(|map| yaml_mapping_get_str(map, "provider"))
+    {
+        if let Some(summary) = yaml_provider_summary(provider) {
+            return vec![summary];
+        }
+        return Vec::new();
+    }
+
+    if let Some(providers) = yaml_mapping(provider_ext)
+        .and_then(|map| yaml_mapping_get_str(map, "providers"))
+        .and_then(YamlValue::as_sequence)
+    {
+        return providers.iter().filter_map(yaml_provider_summary).collect();
+    }
+
+    Vec::new()
+}
+
+fn yaml_provider_summary(value: &YamlValue) -> Option<ProviderSummary> {
+    let provider_type = yaml_mapping(value)
+        .and_then(|map| {
+            yaml_mapping_get_str(map, "id")
+                .or_else(|| yaml_mapping_get_str(map, "provider_type"))
+                .or_else(|| yaml_mapping_get_str(map, "type"))
+        })
+        .and_then(YamlValue::as_str)?
+        .to_string();
+    let config_schema_ref = yaml_mapping(value)
+        .and_then(|map| yaml_mapping_get_str(map, "config_schema_ref"))
+        .and_then(YamlValue::as_str)
+        .map(|s| s.to_string());
+    let runtime = yaml_mapping(value)
+        .and_then(|map| yaml_mapping_get_str(map, "runtime"))
+        .and_then(YamlValue::as_mapping)
+        .map(|map| ProviderRuntimeSummary {
+            component_ref: yaml_mapping_get_str(map, "component_ref")
+                .or_else(|| yaml_mapping_get_str(map, "component"))
+                .and_then(YamlValue::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            export: yaml_mapping_get_str(map, "export")
+                .and_then(YamlValue::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            world: yaml_mapping_get_str(map, "world")
+                .and_then(YamlValue::as_str)
+                .unwrap_or_default()
+                .to_string(),
+        });
+
+    Some(ProviderSummary {
+        provider_type,
+        config_schema_ref,
+        runtime,
+    })
+}
+
+fn yaml_mapping(doc: &YamlValue) -> Option<&Mapping> {
+    doc.as_mapping()
+}
+
+fn yaml_mapping_get_str<'a>(map: &'a Mapping, key: &str) -> Option<&'a YamlValue> {
+    map.get(YamlValue::String(key.to_string(), None))
+}
+
+fn read_zip_member_bytes<R: Read + std::io::Seek>(
+    zip: &mut ZipArchive<R>,
+    suffix: &str,
+) -> Option<Vec<u8>> {
+    for i in 0..zip.len() {
+        let Ok(mut f) = zip.by_index(i) else {
+            continue;
+        };
+        if !f.name().ends_with(suffix) {
+            continue;
+        }
+        let mut buf = Vec::new();
+        if f.read_to_end(&mut buf).is_ok() {
+            return Some(buf);
+        }
+    }
+    None
+}
+
+fn read_zip_nested_suffix<R: Read + std::io::Seek>(
+    zip: &mut ZipArchive<R>,
+    suffix: &str,
+) -> Result<Option<Vec<u8>>> {
+    for i in 0..zip.len() {
+        let Ok(mut f) = zip.by_index(i) else {
+            continue;
+        };
+        if !f.name().ends_with(".gtpack") {
+            continue;
+        }
+        let mut buf = Vec::new();
+        if f.read_to_end(&mut buf).is_err() {
+            continue;
+        }
+        let mut nested = ZipArchive::new(Cursor::new(buf))
+            .with_context(|| format!("failed to read zip {}", f.name()))?;
+        if let Some(found) = read_zip_member_bytes(&mut nested, suffix) {
+            return Ok(Some(found));
+        }
+    }
+    Ok(None)
 }
 
 fn flow_kind_str(kind: &FlowKind) -> String {

@@ -51,10 +51,12 @@ pathdiff = "0.2"
 which = "8"
 redis = { version = "1", features = ["connection-manager", "tokio-comp"] }
 regex = "1"
+urlencoding = "2"
+tar = "0.4"
 greentic-integration-core = { path = "crates/greentic-integration-core", version = "0.4.13" }
 [workspace.package]
 edition = "2024"
-version = "0.4.13"
+version = "0.4.14"
 description = "Greentic integration tooling and test runner"
 license = "MIT"
 repository = "https://github.com/greentic-ai/greentic-integration"
