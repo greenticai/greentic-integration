@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: write
+  packages: read
 
 jobs:
   check:
@@ -17,6 +18,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
+      - name: Install greentic-dev (for e2e tests)
+        run: |
+          cargo install cargo-binstall --locked
+          cargo binstall greentic-dev --no-confirm
       - name: Run checks
         run: scripts/local_check.sh
       - name: Run gtest smoke scripts
