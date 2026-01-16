@@ -576,8 +576,7 @@ fn handle_gtest(args: GtestArgs) -> Result<()> {
     if args.fail_fast {
         cmd.arg("--fail-fast");
     }
-    cmd.arg("--concurrency")
-        .arg(args.concurrency.to_string());
+    cmd.arg("--concurrency").arg(args.concurrency.to_string());
     match args.report {
         GtestReportFormat::Text => {
             cmd.arg("--report").arg("text");
@@ -589,7 +588,9 @@ fn handle_gtest(args: GtestArgs) -> Result<()> {
     if let Some(report_file) = args.report_file {
         cmd.arg("--report-file").arg(report_file);
     }
-    let status = cmd.status().context("failed to spawn greentic-integration-tester")?;
+    let status = cmd
+        .status()
+        .context("failed to spawn greentic-integration-tester")?;
     if !status.success() {
         bail!("gtest runner failed with status {:?}", status.code());
     }

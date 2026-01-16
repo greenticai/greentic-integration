@@ -721,7 +721,10 @@ fn read_limited<R: Read>(mut reader: R, limit: usize) -> Vec<u8> {
 }
 
 fn resolve_command_path(command: &str) -> Result<PathBuf> {
-    if command.contains(std::path::MAIN_SEPARATOR) || command.contains('/') || command.contains('\\') {
+    if command.contains(std::path::MAIN_SEPARATOR)
+        || command.contains('/')
+        || command.contains('\\')
+    {
         return Ok(PathBuf::from(command));
     }
     if command == "greentic-integration-validator" {
