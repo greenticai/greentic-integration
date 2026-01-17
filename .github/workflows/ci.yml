@@ -29,6 +29,7 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
   test:
     runs-on: ubuntu-latest
+    needs: [fmt, clippy]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,6 +39,7 @@ jobs:
         run: cargo test --all-features
   gtest:
     runs-on: ubuntu-latest
+    needs: [fmt, clippy]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,7 +48,6 @@ jobs:
       - name: Install greentic CLIs
         run: |
           cargo binstall greentic-pack --no-confirm
-          cargo binstall greentic-packc --no-confirm
           cargo binstall greentic-component --no-confirm
           cargo binstall greentic-flow --no-confirm
           cargo binstall greentic-runner-cli --no-confirm
@@ -57,7 +58,7 @@ jobs:
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    needs: [fmt, clippy, test, gtest]
+    needs: [test, gtest]
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
@@ -78,7 +79,7 @@ jobs:
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ${{ matrix.os }}
-    needs: [fmt, clippy, test, gtest]
+    needs: [test, gtest]
     strategy:
       matrix:
         include:
