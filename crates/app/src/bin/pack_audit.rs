@@ -198,16 +198,18 @@ fn main() -> Result<()> {
 
 impl Config {
     fn from_env() -> Result<Self> {
-        let github_user = env_nonempty("GITHUB_USER")?;
-        let github_org = env_nonempty("GITHUB_ORG")?;
+        let github_user = env_nonempty("GREENTIC_GITHUB_USER")?;
+        let github_org = env_nonempty("GREENTIC_GITHUB_ORG")?;
         let (owner_type, org) = match (github_user, github_org) {
             (Some(_), Some(_)) => {
-                anyhow::bail!("set only one of GITHUB_USER or GITHUB_ORG");
+                anyhow::bail!("set only one of GREENTIC_GITHUB_USER or GREENTIC_GITHUB_ORG");
             }
             (Some(user), None) => (OwnerType::User, user.clone()),
             (None, Some(org)) => (OwnerType::Org, org),
             (None, None) => {
-                anyhow::bail!("missing required env var: set GITHUB_USER or GITHUB_ORG");
+                anyhow::bail!(
+                    "missing required env var: set GREENTIC_GITHUB_USER or GREENTIC_GITHUB_ORG"
+                );
             }
         };
         let mode = match env::var("GT_PACKS_MODE")
@@ -225,7 +227,7 @@ impl Config {
         let exclude = env::var("GT_PACKS_EXCLUDE_REGEX")
             .ok()
             .and_then(|v| Regex::new(&v).ok());
-        let github_token = require_env_nonempty("GITHUB_TOKEN")?;
+        let github_token = require_env_nonempty("GREENTIC_GITHUB_TOKEN")?;
         let output_dir = env::var("GT_PACK_AUDIT_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| {

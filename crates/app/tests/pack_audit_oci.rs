@@ -43,15 +43,15 @@ struct ProviderRuntimeSummary {
 
 #[test]
 fn pack_audit_results_are_valid() {
-    let has_token = std::env::var("GITHUB_TOKEN")
+    let has_token = std::env::var("GREENTIC_GITHUB_TOKEN")
         .ok()
         .map(|value| !value.trim().is_empty())
         .unwrap_or(false);
-    let has_owner = std::env::var("GITHUB_ORG")
+    let has_owner = std::env::var("GREENTIC_GITHUB_ORG")
         .ok()
         .map(|value| !value.trim().is_empty())
         .unwrap_or(false)
-        || std::env::var("GITHUB_USER")
+        || std::env::var("GREENTIC_GITHUB_USER")
             .ok()
             .map(|value| !value.trim().is_empty())
             .unwrap_or(false);
