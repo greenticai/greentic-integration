@@ -10,6 +10,22 @@ greentic-component doctor ${COMPONENT_DIR}/component.manifest.json
 mkdir -p ${PACK_DIR}/components/ai.greentic.demo-comp
 cp ${COMPONENT_DIR}/target/wasm32-wasip2/release/demo_comp.wasm ${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm
 cp ${COMPONENT_DIR}/component.manifest.json ${PACK_DIR}/components/ai.greentic.demo-comp/component.manifest.json
+python - <<'PY'
+import json
+from pathlib import Path
+
+manifest_path = Path("${PACK_DIR}/components/ai.greentic.demo-comp/component.manifest.json")
+data = json.loads(manifest_path.read_text())
+wasm = data.get("wasm")
+if isinstance(wasm, str):
+    data["wasm"] = "component.wasm"
+elif isinstance(wasm, dict):
+    if "path" in wasm:
+        wasm["path"] = "component.wasm"
+    elif "file" in wasm:
+        wasm["file"] = "component.wasm"
+manifest_path.write_text(json.dumps(data, indent=2, sort_keys=True))
+PY
 
 greentic-flow new --flow ${FLOW_PATH} --id main --type messaging --force
 greentic-flow add-step --flow ${FLOW_PATH} --node-id demo --local-wasm ${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm --operation handle_message --payload "\"hello\"" --routing-out --manifest ${PACK_DIR}/components/ai.greentic.demo-comp/component.manifest.json

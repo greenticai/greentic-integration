@@ -255,9 +255,10 @@ fn env_nonempty(name: &str) -> Result<Option<String>> {
     match env::var(name) {
         Ok(value) => {
             if value.trim().is_empty() {
-                anyhow::bail!("{name} is set but empty; set it to a non-empty value");
+                Ok(None)
+            } else {
+                Ok(Some(value))
             }
-            Ok(Some(value))
         }
         Err(_) => Ok(None),
     }
