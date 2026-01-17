@@ -100,8 +100,12 @@ fn greentic_dev_offline_local_store() -> Result<()> {
     );
     // 2) Install into local store (filesystem fetch) and ensure file exists.
     let store_wasm = work.join("offline_comp.wasm");
-    if store_wasm.is_dir() {
-        fs::remove_dir_all(&store_wasm)?;
+    if store_wasm.exists() {
+        if store_wasm.is_dir() {
+            fs::remove_dir_all(&store_wasm)?;
+        } else {
+            fs::remove_file(&store_wasm)?;
+        }
     }
     let fetch_out = run_with_output(
         &greentic_dev,
