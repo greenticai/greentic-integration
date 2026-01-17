@@ -43,6 +43,13 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup tooling
         uses: ./.github/actions/ci-setup
+      - name: Install greentic CLIs
+        run: |
+          cargo binstall greentic-pack --no-confirm
+          cargo binstall greentic-packc --no-confirm
+          cargo binstall greentic-component --no-confirm
+          cargo binstall greentic-flow --no-confirm
+          cargo binstall greentic-runner-cli --no-confirm
       - name: Run gtest smoke scripts
         run: |
           cargo run -p greentic-integration-tester -- --test tests/gtests/00_smoke_validator.gtest

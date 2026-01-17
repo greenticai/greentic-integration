@@ -7,9 +7,10 @@ greentic-pack new --dir ${PACK_DIR} demo-pack
 greentic-component new --name demo-comp --path ${COMPONENT_DIR} --non-interactive --no-git
 greentic-component build --manifest ${COMPONENT_DIR}/component.manifest.json
 greentic-component doctor ${COMPONENT_DIR}/component.manifest.json
+cp ${COMPONENT_DIR}/target/wasm32-wasip2/release/demo_comp.wasm ${PACK_DIR}/components/ai.greentic.demo-comp.wasm
 
 greentic-flow new --flow ${FLOW_PATH} --id main --type messaging --force
-greentic-flow add-step --flow ${FLOW_PATH} --node-id demo --local-wasm ${COMPONENT_DIR}/target/wasm32-wasip2/release/demo_comp.wasm --operation handle_message --payload "\"hello\"" --routing-out --manifest ${COMPONENT_DIR}/component.manifest.json
+greentic-flow add-step --flow ${FLOW_PATH} --node-id demo --local-wasm ${PACK_DIR}/components/ai.greentic.demo-comp.wasm --operation handle_message --payload "\"hello\"" --routing-out --manifest ${COMPONENT_DIR}/component.manifest.json
 greentic-flow add-step --flow ${FLOW_PATH} --after demo --node-id template --component oci://ghcr.io/greentic-ai/components/templates:latest --operation render --payload "{\"template\":\"Result: {{node.demo}}\"}" --routing-out
 greentic-flow update-step --flow ${FLOW_PATH} --step demo --routing-next template
 
