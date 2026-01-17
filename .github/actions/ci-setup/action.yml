@@ -1,0 +1,54 @@
+name: CI setup
+description: Set up Rust tooling and Greentic dependencies for CI
+inputs:
+  rust-toolchain:
+    description: Rust toolchain version
+    required: false
+    default: stable
+runs:
+  using: composite
+  steps:
+    - name: Add local bin to PATH
+      shell: bash
+      run: |
+        mkdir -p "$HOME/.local/bin"
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+    - name: Cache rustup
+      uses: actions/cache@v4
+      with:
+        path: ~/.rustup
+        key: rustup-${{ runner.os }}-${{ inputs.rust-toolchain }}-wasm32-wasip2
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: ${{ inputs.rust-toolchain }}
+        targets: wasm32-wasip2
+    - name: Cache cargo
+      uses: Swatinem/rust-cache@v2
+    - name: Cache tools
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin
+          ~/.cache/cargo-binstall
+          ~/.local/bin
+        key: tools-${{ runner.os }}-v1
+    - name: Install cargo-binstall
+      shell: bash
+      run: |
+        if ! command -v cargo-binstall >/dev/null 2>&1; then
+          cargo install cargo-binstall --locked
+        fi
+    - name: Install greentic-dev
+      shell: bash
+      run: |
+        if ! command -v greentic-dev >/dev/null 2>&1; then
+          cargo binstall greentic-dev --no-confirm
+        fi
+    - name: Install crane
+      shell: bash
+      run: |
+        if ! command -v crane >/dev/null 2>&1; then
+          curl -sL https://github.com/google/go-containerregistry/releases/download/v0.20.3/crane-linux-amd64 -o "$HOME/.local/bin/crane"
+          chmod +x "$HOME/.local/bin/crane"
+        fi

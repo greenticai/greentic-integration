@@ -99,7 +99,7 @@ fn greentic_dev_offline_local_store() -> Result<()> {
         build_out.stderr
     );
     // 2) Install into local store (filesystem fetch) and ensure file exists.
-    let store_wasm = store_path.join("offline_comp.wasm");
+    let store_wasm = work.join("offline_comp.wasm");
     let fetch_out = run_with_output(
         &greentic_dev,
         &[
