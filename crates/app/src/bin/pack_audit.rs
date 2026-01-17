@@ -6,9 +6,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow};
-use async_trait::async_trait;
 use flate2::read::GzDecoder;
-use greentic_distributor_client::oci_packs::{PulledImage, PulledLayer, RegistryClient};
 use greentic_distributor_client::{OciPackFetcher, PackFetchOptions};
 use greentic_types::{
     cbor::decode_pack_manifest,
@@ -16,10 +14,6 @@ use greentic_types::{
     pack_manifest::{PackKind, PackManifest},
     provider::{PROVIDER_EXTENSION_ID, ProviderRuntimeRef},
 };
-use oci_distribution::Reference;
-use oci_distribution::client::{Client, ClientConfig, ClientProtocol, ImageData};
-use oci_distribution::errors::OciDistributionError;
-use oci_distribution::secrets::RegistryAuth;
 use regex::Regex;
 use serde::Serialize;
 use serde_yaml_bw::{Mapping, Value as YamlValue};
@@ -36,7 +30,6 @@ struct Config {
     include: Option<Regex>,
     exclude: Option<Regex>,
     github_token: String,
-    ghcr_username: String,
     output_dir: PathBuf,
 }
 
@@ -136,14 +129,30 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let pack_opts = PackFetchOptions {
+    let mut pack_opts = PackFetchOptions {
         allow_tags: true,
         ..PackFetchOptions::default()
     };
-    let pack_fetcher = OciPackFetcher::with_client(
-        GhcrRegistryClient::new(&cfg.github_token, &cfg.ghcr_username),
-        pack_opts,
-    );
+    let legacy_layer_media_type = "application/vnd.greentic.gtpack+zip";
+    if !pack_opts
+        .accepted_layer_media_types
+        .iter()
+        .any(|ty| ty == legacy_layer_media_type)
+    {
+        pack_opts
+            .accepted_layer_media_types
+            .push(legacy_layer_media_type.to_string());
+    }
+    if !pack_opts
+        .preferred_layer_media_types
+        .iter()
+        .any(|ty| ty == legacy_layer_media_type)
+    {
+        pack_opts
+            .preferred_layer_media_types
+            .push(legacy_layer_media_type.to_string());
+    }
+    let pack_fetcher = OciPackFetcher::new(pack_opts);
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -187,85 +196,16 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-#[derive(Clone)]
-struct GhcrRegistryClient {
-    inner: Client,
-    auth: RegistryAuth,
-}
-
-impl GhcrRegistryClient {
-    fn new(token: &str, username: &str) -> Self {
-        let config = ClientConfig {
-            protocol: ClientProtocol::Https,
-            ..Default::default()
-        };
-        let auth = if token.trim().is_empty() {
-            RegistryAuth::Anonymous
-        } else {
-            RegistryAuth::Basic(username.to_string(), token.to_string())
-        };
-        Self {
-            inner: Client::new(config),
-            auth,
-        }
-    }
-}
-
-#[async_trait]
-impl RegistryClient for GhcrRegistryClient {
-    fn default_client() -> Self {
-        let config = ClientConfig {
-            protocol: ClientProtocol::Https,
-            ..Default::default()
-        };
-        Self {
-            inner: Client::new(config),
-            auth: RegistryAuth::Anonymous,
-        }
-    }
-
-    async fn pull(
-        &self,
-        reference: &Reference,
-        accepted_manifest_types: &[&str],
-    ) -> Result<PulledImage, OciDistributionError> {
-        let image = self
-            .inner
-            .pull(reference, &self.auth, accepted_manifest_types.to_vec())
-            .await?;
-        Ok(convert_image(image))
-    }
-}
-
-fn convert_image(image: ImageData) -> PulledImage {
-    let layers = image
-        .layers
-        .into_iter()
-        .map(|layer| {
-            let digest = format!("sha256:{}", layer.sha256_digest());
-            PulledLayer {
-                media_type: layer.media_type,
-                data: layer.data,
-                digest: Some(digest),
-            }
-        })
-        .collect();
-    PulledImage {
-        digest: image.digest,
-        layers,
-    }
-}
-
 impl Config {
     fn from_env() -> Result<Self> {
         let github_user = env_nonempty("GITHUB_USER")?;
         let github_org = env_nonempty("GITHUB_ORG")?;
-        let (owner_type, org, owner_user) = match (github_user, github_org) {
+        let (owner_type, org) = match (github_user, github_org) {
             (Some(_), Some(_)) => {
                 anyhow::bail!("set only one of GITHUB_USER or GITHUB_ORG");
             }
-            (Some(user), None) => (OwnerType::User, user.clone(), Some(user)),
-            (None, Some(org)) => (OwnerType::Org, org, None),
+            (Some(user), None) => (OwnerType::User, user.clone()),
+            (None, Some(org)) => (OwnerType::Org, org),
             (None, None) => {
                 anyhow::bail!("missing required env var: set GITHUB_USER or GITHUB_ORG");
             }
@@ -286,11 +226,6 @@ impl Config {
             .ok()
             .and_then(|v| Regex::new(&v).ok());
         let github_token = require_env_nonempty("GITHUB_TOKEN")?;
-        let ghcr_username = if let Some(user) = owner_user {
-            user
-        } else {
-            env_nonempty("GITHUB_ACTOR")?.unwrap_or_else(|| "oauth2".to_string())
-        };
         let output_dir = env::var("GT_PACK_AUDIT_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| {
@@ -309,7 +244,6 @@ impl Config {
             include,
             exclude,
             github_token,
-            ghcr_username,
             output_dir,
         })
     }
@@ -510,8 +444,8 @@ fn fetch_versions(
     Ok(versions)
 }
 
-fn audit_single<C: RegistryClient>(
-    fetcher: &OciPackFetcher<C>,
+fn audit_single(
+    fetcher: &OciPackFetcher,
     runtime: &tokio::runtime::Runtime,
     target: &AuditTarget,
 ) -> Result<AuditEntry> {

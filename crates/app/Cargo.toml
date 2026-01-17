@@ -42,7 +42,6 @@ redis.workspace = true
 regex = "1"
 flate2 = "1"
 zstd = "0.13"
-oci-distribution = "0.11"
 urlencoding.workspace = true
 tar.workspace = true
 zip = { version = "0.6", default-features = false, features = ["deflate"] }

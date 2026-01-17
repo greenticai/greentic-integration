@@ -854,7 +854,7 @@ checksum = "d7a1e2f27636f116493b8b860f5546edb47c8d8f8ea73e1d2a20be88e28d1fea"
 
 [[package]]
 name = "deploy-plan-component"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "greentic-interfaces-guest",
  "serde_json",
@@ -1123,21 +1123,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
-name = "foreign-types"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6f339eb8adc052cd2ca78910fda869aefa38d22d5cb648e6485e4d3fc06f3b1"
-dependencies = [
- "foreign-types-shared",
-]
-
-[[package]]
-name = "foreign-types-shared"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
-
-[[package]]
 name = "form_urlencoded"
 version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1313,9 +1298,9 @@ dependencies = [
 
 [[package]]
 name = "greentic-distributor-client"
-version = "0.4.22"
+version = "0.4.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01d5598364598c474c49d4660b41e56a92f139be6ff2b7626040494d19a3cbb3"
+checksum = "86e9e7bcb2689b0bf29d4d5d347343fccbf9dcbca7bef5f6cc77f75000b79b6e"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1336,7 +1321,7 @@ dependencies = [
 
 [[package]]
 name = "greentic-integration"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "anyhow",
  "async-nats",
@@ -1354,7 +1339,6 @@ dependencies = [
  "humantime",
  "insta",
  "notify",
- "oci-distribution",
  "once_cell",
  "parking_lot",
  "pathdiff",
@@ -1385,7 +1369,7 @@ dependencies = [
 
 [[package]]
 name = "greentic-integration-core"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "serde",
  "thiserror 2.0.17",
@@ -1393,7 +1377,7 @@ dependencies = [
 
 [[package]]
 name = "greentic-integration-tester"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "anyhow",
  "clap",
@@ -1408,7 +1392,7 @@ dependencies = [
 
 [[package]]
 name = "greentic-integration-validator"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "anyhow",
  "clap",
@@ -1420,9 +1404,9 @@ dependencies = [
 
 [[package]]
 name = "greentic-interfaces"
-version = "0.4.73"
+version = "0.4.74"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80d591d7b79b104aa3d0097b36f112e08e909fb8be2152a5ea4f1de16bd66a0b"
+checksum = "6350480899d3d6b53bd48c439112825844d92a2c9982cc251b9b546cb45e897d"
 dependencies = [
  "anyhow",
  "greentic-types",
@@ -1437,9 +1421,9 @@ dependencies = [
 
 [[package]]
 name = "greentic-interfaces-guest"
-version = "0.4.73"
+version = "0.4.74"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3250c68f0298e8e7460b3f188f6f1bcbd27e7ffc0f43815692aa318f05bac3cc"
+checksum = "c7bebedb26b54ce4f95792d77751239068dfe95b9a2403d7475a000458a3c184"
 dependencies = [
  "greentic-interfaces",
  "greentic-types",
@@ -1450,9 +1434,9 @@ dependencies = [
 
 [[package]]
 name = "greentic-types"
-version = "0.4.33"
+version = "0.4.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2012e90e0ed198dc232ef354844dfb3c2276001fd3e87d48894a5b59c6b9c8f"
+checksum = "bbc14873ed29c9211a82f90137ca9e1ad2ae2d3e0ec47bbaf786dd6ceab14b2b"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1634,22 +1618,6 @@ dependencies = [
  "tokio-rustls",
  "tower-service",
  "webpki-roots 1.0.5",
-]
-
-[[package]]
-name = "hyper-tls"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70206fc6890eaca9fde8a0bf71caa2ddfc9fe045ac9e5c70df101a7dbde866e0"
-dependencies = [
- "bytes",
- "http-body-util",
- "hyper",
- "hyper-util",
- "native-tls",
- "tokio",
- "tokio-native-tls",
- "tower-service",
 ]
 
 [[package]]
@@ -2141,23 +2109,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "native-tls"
-version = "0.2.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87de3442987e9dbec73158d5c715e7ad9072fda936bb03d19d7fa10e00520f0e"
-dependencies = [
- "libc",
- "log",
- "openssl",
- "openssl-probe 0.1.6",
- "openssl-sys",
- "schannel",
- "security-framework 2.11.1",
- "security-framework-sys",
- "tempfile",
-]
-
-[[package]]
 name = "nkeys"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2309,32 +2260,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
-name = "openssl"
-version = "0.10.75"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08838db121398ad17ab8531ce9de97b244589089e290a384c900cb9ff7434328"
-dependencies = [
- "bitflags 2.10.0",
- "cfg-if",
- "foreign-types",
- "libc",
- "once_cell",
- "openssl-macros",
- "openssl-sys",
-]
-
-[[package]]
-name = "openssl-macros"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a948666b637a0f465e8564c73e89d4dde00d72d4d473cc972f390fc3dcee7d9c"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "openssl-probe"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2345,18 +2270,6 @@ name = "openssl-probe"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f50d9b3dabb09ecd771ad0aa242ca6894994c130308ca3d7684634df8037391"
-
-[[package]]
-name = "openssl-sys"
-version = "0.9.111"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82cab2d520aa75e3c58898289429321eb788c3106963d0dc886ec7a5f4adc321"
-dependencies = [
- "cc",
- "libc",
- "pkg-config",
- "vcpkg",
-]
 
 [[package]]
 name = "option-ext"
@@ -2603,7 +2516,7 @@ dependencies = [
 
 [[package]]
 name = "providers-sim"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "hex",
  "serde",
@@ -2931,11 +2844,9 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-rustls",
- "hyper-tls",
  "hyper-util",
  "js-sys",
  "log",
- "native-tls",
  "percent-encoding",
  "pin-project-lite",
  "quinn",
@@ -2946,7 +2857,6 @@ dependencies = [
  "serde_urlencoded",
  "sync_wrapper",
  "tokio",
- "tokio-native-tls",
  "tokio-rustls",
  "tokio-util",
  "tower",
@@ -3014,7 +2924,7 @@ dependencies = [
 
 [[package]]
 name = "runner-smoke"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "anyhow",
  "serde",
@@ -3843,16 +3753,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-native-tls"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbae76ab933c85776efabc971569dd6119c580d8f5d448769dec1764bf796ef2"
-dependencies = [
- "native-tls",
- "tokio",
-]
-
-[[package]]
 name = "tokio-postgres"
 version = "0.7.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4289,12 +4189,6 @@ name = "valuable"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
-
-[[package]]
-name = "vcpkg"
-version = "0.2.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "version_check"
