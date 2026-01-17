@@ -50,7 +50,7 @@ jobs:
           cargo binstall greentic-pack --no-confirm
           cargo binstall greentic-component --no-confirm
           cargo binstall greentic-flow --no-confirm
-          cargo binstall greentic-runner-cli --no-confirm
+          cargo binstall greentic-runner --no-confirm
       - name: Run gtest smoke scripts
         run: |
           cargo run -p greentic-integration-tester -- --test tests/gtests/00_smoke_validator.gtest
@@ -58,7 +58,7 @@ jobs:
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    needs: [test, gtest]
+    needs: [fmt, clippy]
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
@@ -79,7 +79,7 @@ jobs:
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ${{ matrix.os }}
-    needs: [test, gtest]
+    needs: [fmt, clippy]
     strategy:
       matrix:
         include:
