@@ -79,6 +79,10 @@ struct RunArgs {
     #[arg(long, value_name = "SEED")]
     seed: Option<u64>,
 
+    /// Summarize errors for failing scenarios to stderr
+    #[arg(long)]
+    errors: bool,
+
     /// Normalization config for JSON directives
     #[arg(long, value_name = "PATH")]
     normalize_config: Option<PathBuf>,
@@ -129,6 +133,10 @@ struct LegacyArgs {
     /// Number of reruns for flake triage
     #[arg(long, value_name = "N", default_value_t = 3)]
     triage_runs: u32,
+
+    /// Summarize errors for failing tests to stderr
+    #[arg(long)]
+    errors: bool,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -390,6 +398,9 @@ fn main() -> Result<()> {
 
     let any_failed = outcomes.iter().any(|o| !o.success);
     if any_failed {
+        if legacy.errors {
+            emit_error_summary(&outcomes);
+        }
         bail!("one or more tests failed");
     }
     Ok(())
@@ -434,6 +445,9 @@ fn run_new(args: RunArgs) -> Result<()> {
         .iter()
         .any(|result| result.status == gtest::ScenarioStatus::Failed);
     if any_failed {
+        if args.errors {
+            emit_scenario_error_summary(&results);
+        }
         bail!("one or more scenarios failed");
     }
     Ok(())
@@ -1545,6 +1559,83 @@ fn format_exit_description(status: Option<&ExitStatus>, timed_out: bool) -> Stri
         return format!("signal {signal}");
     }
     "unknown".to_string()
+}
+
+fn emit_error_summary(outcomes: &[RunOutcome]) {
+    let mut failures: Vec<&RunOutcome> = outcomes.iter().filter(|o| !o.success).collect();
+    if failures.is_empty() {
+        return;
+    }
+    failures.sort_by(|a, b| a.report.test_path.cmp(&b.report.test_path));
+    eprintln!("gtest error summary:");
+    for outcome in failures {
+        let details = extract_failure_details(&outcome.transcript);
+        if details.is_empty() {
+            eprintln!("- {}: failed", outcome.report.test_path);
+        } else {
+            eprintln!("- {}: {}", outcome.report.test_path, details.join(" | "));
+        }
+    }
+}
+
+fn extract_failure_details(transcript: &str) -> Vec<String> {
+    let mut lines = Vec::new();
+    for line in transcript.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("failure:")
+            || trimmed.starts_with("error:")
+            || trimmed.starts_with("status: failed")
+        {
+            lines.push(trimmed.to_string());
+        }
+    }
+    if lines.is_empty() {
+        if let Some(last) = transcript.lines().rev().find(|line| !line.trim().is_empty()) {
+            lines.push(last.trim().to_string());
+        }
+    }
+    if lines.len() > 3 {
+        lines.split_off(lines.len() - 3)
+    } else {
+        lines
+    }
+}
+
+fn emit_scenario_error_summary(results: &[gtest::ScenarioResult]) {
+    let mut failures: Vec<&gtest::ScenarioResult> = results
+        .iter()
+        .filter(|result| result.status == gtest::ScenarioStatus::Failed)
+        .collect();
+    if failures.is_empty() {
+        return;
+    }
+    failures.sort_by(|a, b| a.path.cmp(&b.path));
+    eprintln!("gtest error summary:");
+    for result in failures {
+        let mut line = if let Some(failure) = &result.failure {
+            format!(
+                "- {}:{}: {}",
+                result.path.display(),
+                failure.line_no,
+                collapse_ws(&failure.message)
+            )
+        } else {
+            format!("- {}: failed", result.path.display())
+        };
+        if let Some(hint) = &result.replay_hint {
+            line.push_str(" | replay: ");
+            line.push_str(&collapse_ws(hint));
+        }
+        eprintln!("{line}");
+    }
+}
+
+fn collapse_ws(value: &str) -> String {
+    value
+        .split_whitespace()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn read_limited<R: Read>(mut reader: R, limit: usize) -> Vec<u8> {
