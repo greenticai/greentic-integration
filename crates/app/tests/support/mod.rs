@@ -107,6 +107,9 @@ pub fn ensure_tool(
     if let Ok(path) = which(binary) {
         return Ok(Some(path));
     }
+    if let Some(path) = cargo_bin_path(binary) {
+        return Ok(Some(path));
+    }
 
     let status = Command::new("cargo")
         .args(["binstall", crate_name, "--no-confirm"])
@@ -130,6 +133,19 @@ pub fn ensure_tool(
         );
         Ok(None)
     }
+}
+
+fn cargo_bin_path(binary: &str) -> Option<PathBuf> {
+    let cargo_home = std::env::var("CARGO_HOME")
+        .ok()
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var("HOME")
+                .ok()
+                .map(|home| PathBuf::from(home).join(".cargo"))
+        })?;
+    let path = cargo_home.join("bin").join(binary);
+    if path.exists() { Some(path) } else { None }
 }
 
 static LOG_ONCE: Once = Once::new();

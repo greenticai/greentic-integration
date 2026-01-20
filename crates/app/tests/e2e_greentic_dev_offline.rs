@@ -124,7 +124,7 @@ fn greentic_dev_offline_local_store() -> Result<()> {
         &envs,
         &offline_env,
     );
-    if !fetch_out.status.success() && fetch_out.stderr.contains("Is a directory") {
+    if !fetch_out.status.success() && output_contains(&fetch_out, "is a directory") {
         let fetch_dir = work.join("store-fetch");
         if fetch_dir.exists() {
             fs::remove_dir_all(&fetch_dir)?;
@@ -385,6 +385,12 @@ fn run_with_output(
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
         stderr: String::from_utf8_lossy(&output.stderr).to_string(),
     }
+}
+
+fn output_contains(output: &CmdOutput, needle: &str) -> bool {
+    let needle = needle.to_ascii_lowercase();
+    output.stdout.to_ascii_lowercase().contains(&needle)
+        || output.stderr.to_ascii_lowercase().contains(&needle)
 }
 
 fn find_gtpack(pack_dir: &Path) -> Result<PathBuf> {
