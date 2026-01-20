@@ -1752,6 +1752,7 @@ mod tests {
             report_file: None,
             triage_flakes: false,
             triage_runs: 3,
+            errors: false,
         }
     }
 
