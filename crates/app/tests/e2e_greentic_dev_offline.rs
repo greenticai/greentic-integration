@@ -103,7 +103,7 @@ fn greentic_dev_offline_local_store() -> Result<()> {
     if fetch_dir.exists() {
         fs::remove_dir_all(&fetch_dir)?;
     }
-    let fetch_out = run_with_output(
+    let mut fetch_out = run_with_output(
         &greentic_dev,
         &[
             "component",
@@ -119,6 +119,63 @@ fn greentic_dev_offline_local_store() -> Result<()> {
         &envs,
         &offline_env,
     );
+    let mut store_wasm = None;
+    if fetch_out.status.success() {
+        store_wasm = Some(find_wasm(&fetch_dir)?);
+    } else if output_contains(&fetch_out, "unexpected argument '--out'")
+        || output_contains(&fetch_out, "usage: greentic-component store fetch --output")
+    {
+        let legacy_out = work.join("offline_comp.wasm");
+        if legacy_out.exists() {
+            if legacy_out.is_dir() {
+                fs::remove_dir_all(&legacy_out)?;
+            } else {
+                fs::remove_file(&legacy_out)?;
+            }
+        }
+        fetch_out = run_with_output(
+            &greentic_dev,
+            &[
+                "component",
+                "store",
+                "fetch",
+                "--output",
+                legacy_out.to_str().unwrap(),
+                comp_dir.to_str().unwrap(),
+                "--cache-dir",
+                store_path.to_str().unwrap(),
+            ],
+            work,
+            &envs,
+            &offline_env,
+        );
+        if fetch_out.status.success() {
+            store_wasm = Some(legacy_out);
+        } else if output_contains(&fetch_out, "is a directory") {
+            if fetch_dir.exists() {
+                fs::remove_dir_all(&fetch_dir)?;
+            }
+            fetch_out = run_with_output(
+                &greentic_dev,
+                &[
+                    "component",
+                    "store",
+                    "fetch",
+                    "--output",
+                    fetch_dir.to_str().unwrap(),
+                    comp_dir.to_str().unwrap(),
+                    "--cache-dir",
+                    store_path.to_str().unwrap(),
+                ],
+                work,
+                &envs,
+                &offline_env,
+            );
+            if fetch_out.status.success() {
+                store_wasm = Some(find_wasm(&fetch_dir)?);
+            }
+        }
+    }
     if !fetch_out.status.success() {
         if !strict {
             eprintln!(
@@ -132,7 +189,7 @@ fn greentic_dev_offline_local_store() -> Result<()> {
             fetch_out.stderr
         );
     }
-    let store_wasm = find_wasm(&fetch_dir)?;
+    let store_wasm = store_wasm.ok_or_else(|| anyhow::anyhow!("store fetch produced no wasm"))?;
     assert!(
         !fetch_out.stderr.contains("Could not resolve host")
             && !fetch_out.stderr.to_lowercase().contains("failed to get"),
@@ -357,6 +414,12 @@ fn run_with_output(
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
         stderr: String::from_utf8_lossy(&output.stderr).to_string(),
     }
+}
+
+fn output_contains(output: &CmdOutput, needle: &str) -> bool {
+    let needle = needle.to_ascii_lowercase();
+    output.stdout.to_ascii_lowercase().contains(&needle)
+        || output.stderr.to_ascii_lowercase().contains(&needle)
 }
 
 fn find_gtpack(pack_dir: &Path) -> Result<PathBuf> {

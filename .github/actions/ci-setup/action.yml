@@ -43,7 +43,7 @@ runs:
       shell: bash
       run: |
         if ! command -v greentic-dev >/dev/null 2>&1; then
-          cargo binstall greentic-dev --no-confirm
+          cargo binstall greentic-dev --no-confirm --force
         fi
     - name: Install crane
       shell: bash
