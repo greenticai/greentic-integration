@@ -16,6 +16,7 @@ pub struct TestPlan {
 /// A single line in a test plan with preserved raw content.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Step {
+    pub path: PathBuf,
     pub line_no: usize,
     pub raw: String,
     pub kind: StepKind,
@@ -35,6 +36,13 @@ pub enum Directive {
         key: String,
         value: String,
     },
+    SetCommand {
+        key: String,
+        command: String,
+    },
+    Unset {
+        key: String,
+    },
     Env {
         key: String,
         value: String,
@@ -49,15 +57,63 @@ pub enum Directive {
         equals: Option<i32>,
         not_equals: Option<i32>,
     },
+    Assert {
+        assertion: Assertion,
+    },
     Capture {
         name: String,
     },
     Print {
         name: String,
     },
+    DebugVars,
     Skip {
         reason: String,
     },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Assertion {
+    pub kind: AssertionKind,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AssertionKind {
+    Exit {
+        equals: Option<i32>,
+        not_equals: Option<i32>,
+    },
+    StdoutContains {
+        value: String,
+    },
+    StderrContains {
+        value: String,
+    },
+    FileExists {
+        path: String,
+    },
+    FileNotExists {
+        path: String,
+    },
+    JsonPath {
+        source: JsonSource,
+        path: String,
+        op: JsonAssertOp,
+        value: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum JsonSource {
+    LastStdout,
+    File { path: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum JsonAssertOp {
+    Equals,
+    Exists,
+    NotExists,
 }
 
 /// A command line parsed into argv tokens.

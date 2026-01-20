@@ -1,0 +1,153 @@
+name: Nightly E2E Matrix
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  nightly-matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        domain: [messaging, events, secrets]
+        test-type: [doctor, conformance, runner, component]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup tooling
+        uses: ./.github/actions/ci-setup
+
+      - name: Install greentic CLIs
+        shell: bash
+        run: |
+          cargo binstall greentic-pack --no-confirm --force
+          cargo binstall greentic-messaging-test --no-confirm --force
+          cargo binstall greentic-events-test --no-confirm --force
+          cargo binstall greentic-secrets-test --no-confirm --force
+          cargo binstall greentic-runner --no-confirm --force
+          cargo binstall greentic-component --no-confirm --force
+
+      - name: Prepare packs
+        shell: bash
+        run: |
+          mkdir -p dist
+          rsync -a packs/ dist/packs/
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          ARTIFACTS_DIR="artifacts/${{ matrix.domain }}/${{ matrix.test-type }}"
+          mkdir -p "${ARTIFACTS_DIR}"
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> "$GITHUB_ENV"
+
+      - name: Pack doctor
+        shell: bash
+        run: |
+          set -euo pipefail
+          greentic-pack doctor --validate --packs dist/packs | tee "${ARTIFACTS_DIR}/pack_doctor.log"
+
+      - name: Domain conformance (dry-run)
+        if: matrix.test-type == 'conformance'
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.domain }}" in
+            messaging)
+              greentic-messaging-test e2e --packs dist/packs --report "${ARTIFACTS_DIR}/messaging.json" --dry-run
+              ;;
+            events)
+              greentic-events-test e2e --packs dist/packs --report "${ARTIFACTS_DIR}/events.json" --dry-run
+              ;;
+            secrets)
+              greentic-secrets-test e2e --packs dist/packs --report "${ARTIFACTS_DIR}/secrets.json" --dry-run
+              ;;
+          esac
+
+      - name: Runner conformance + fault matrix
+        if: matrix.test-type == 'runner'
+        shell: bash
+        run: |
+          set -euo pipefail
+          greentic-runner conformance --packs dist/packs --level L2 --report "${ARTIFACTS_DIR}/runner.json"
+          greentic-runner conformance --packs dist/packs --faults tests/fixtures/faults/basic.json --report "${ARTIFACTS_DIR}/faults.json"
+
+      - name: Component contract tests
+        if: matrix.test-type == 'component'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p greentic-component --all-features | tee "${ARTIFACTS_DIR}/component_tests.log"
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-${{ matrix.domain }}-${{ matrix.test-type }}
+          path: |
+            ${{ env.ARTIFACTS_DIR }}
+            target/e2e/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          pack_count=$(find dist/packs -maxdepth 2 \( -name "pack.yaml" -o -name "pack.json" \) 2>/dev/null | wc -l | tr -d ' ')
+          {
+            echo "### Nightly ${{ matrix.domain }} / ${{ matrix.test-type }}"
+            echo ""
+            echo "- Packs tested: ${pack_count}"
+            echo "- Status: ${{ job.status }}"
+            echo "- Artifacts: nightly-${{ matrix.domain }}-${{ matrix.test-type }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  gtest-triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup tooling
+        uses: ./.github/actions/ci-setup
+
+      - name: Install greentic CLIs
+        shell: bash
+        run: |
+          cargo binstall greentic-pack --no-confirm --force
+          cargo binstall greentic-component --no-confirm --force
+          cargo binstall greentic-flow --no-confirm --force
+          cargo binstall greentic-runner --no-confirm --force
+
+      - name: Run gtest smoke with triage
+        shell: bash
+        run: |
+          cargo run -p greentic-integration-tester -- \
+            --test tests/gtests/00_smoke_validator.gtest \
+            --triage-flakes \
+            --triage-runs 3
+          cargo run -p greentic-integration-tester -- \
+            --test tests/gtests/01_capture_and_expect.gtest \
+            --triage-flakes \
+            --triage-runs 3
+
+      - name: Upload flake artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-flake-artifacts
+          path: |
+            target/flake-artifacts/**
+            target/e2e/**
+          if-no-files-found: ignore
+          retention-days: 14
