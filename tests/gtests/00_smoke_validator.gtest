@@ -2,12 +2,8 @@
 @set COMPONENT_DIR=${WORK_DIR}/demo-comp
 @set FLOW_PATH=${PACK_DIR}/flows/main.ygtc
 @set ARTIFACTS_DIR=${WORK_DIR}/artifacts
-@set VALIDATOR=${REPO_ROOT}/target/debug/greentic-integration-validator
 @env CARGO_NET_OFFLINE=true
 
-@cd ${REPO_ROOT}
-cargo build -p greentic-integration-validator
-@cd ${WORK_DIR}
 greentic-pack new --dir ${PACK_DIR} demo-pack
 greentic-component new --name demo-comp --path ${COMPONENT_DIR} --non-interactive --no-git --no-check
 greentic-component build --manifest ${COMPONENT_DIR}/component.manifest.json
@@ -133,8 +129,8 @@ cp ${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm ${PACK_DIR}/compo
 greentic-pack resolve --in ${PACK_DIR} --offline
 greentic-pack build --in ${PACK_DIR} --allow-oci-tags --no-update
 greentic-pack doctor --in ${PACK_DIR} --allow-oci-tags
-${VALIDATOR} file exists ${PACK_DIR}/dist/demo-pack.gtpack
+test -f ${PACK_DIR}/dist/demo-pack.gtpack
 
 greentic-runner-cli --pack ${PACK_DIR}/dist/demo-pack.gtpack --input "\"hello\"" --artifacts-dir ${ARTIFACTS_DIR} --json
-${VALIDATOR} file exists ${ARTIFACTS_DIR}/transcript.jsonl
-${VALIDATOR} file contains ${ARTIFACTS_DIR}/transcript.jsonl "ai.greentic.demo-comp"
+test -f ${ARTIFACTS_DIR}/transcript.jsonl
+sh -c 'rg -q "ai.greentic.demo-comp" ${ARTIFACTS_DIR}/transcript.jsonl || grep -q "ai.greentic.demo-comp" ${ARTIFACTS_DIR}/transcript.jsonl'

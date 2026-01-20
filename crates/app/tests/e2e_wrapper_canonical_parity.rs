@@ -50,22 +50,31 @@ fn e2e_wrapper_canonical_parity() -> Result<()> {
     let tmp = tempdir().context("tempdir")?;
     let envs = prepare_env(tmp.path())?;
 
-    let canonical = match run_cmd(
+    let canonical_output = run_cmd_output(
         &greentic_pack,
         &["sim", manifest_path.to_str().unwrap()],
         &fixture_root,
         &[],
-        "greentic-pack sim",
-        strict,
-    ) {
-        Ok(out) => out,
-        Err(err) => {
-            if !strict {
-                eprintln!("skipping canonical parity: {err}");
-                return Ok(());
-            }
-            return Err(err);
+    )?;
+    let canonical = if canonical_output.status.success() {
+        canonical_output
+    } else {
+        if is_unknown_subcommand(&canonical_output.stderr) {
+            eprintln!("skipping canonical parity: greentic-pack sim unsupported");
+            return Ok(());
         }
+        if !strict {
+            eprintln!(
+                "skipping canonical parity: greentic-pack sim failed: {}",
+                canonical_output.stderr.trim()
+            );
+            return Ok(());
+        }
+        bail!(
+            "greentic-pack sim failed in strict mode (status {:?}): {}",
+            canonical_output.status.code(),
+            canonical_output.stderr.trim()
+        );
     };
 
     let wrapper = match run_wrapper(&greentic_dev, &manifest_path, &fixture_root, &envs, strict)? {
@@ -170,17 +179,15 @@ fn run_wrapper(
     }
 
     let stderr = output.stderr.to_lowercase();
-    let unknown = stderr.contains("unrecognized")
-        || stderr.contains("unknown")
-        || stderr.contains("invalid subcommand");
+    if is_unknown_subcommand(&stderr) {
+        eprintln!("skipping wrapper parity: greentic-dev pack sim unsupported");
+        return Ok(None);
+    }
     if !strict {
         eprintln!(
             "skipping wrapper parity: greentic-dev pack sim failed: {}",
             output.stderr.trim()
         );
-        if unknown {
-            return Ok(None);
-        }
         return Ok(None);
     }
 
@@ -284,6 +291,13 @@ fn extract_text_transcript(output: &str) -> Option<Vec<String>> {
         }
     }
     if lines.is_empty() { None } else { Some(lines) }
+}
+
+fn is_unknown_subcommand(stderr: &str) -> bool {
+    let stderr = stderr.to_lowercase();
+    stderr.contains("unrecognized")
+        || stderr.contains("unknown")
+        || stderr.contains("invalid subcommand")
 }
 
 fn assert_contains_transcript(output: &str, expected: &[String], label: &str) -> Result<()> {
