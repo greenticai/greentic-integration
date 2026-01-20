@@ -2,8 +2,6 @@
 @set COMPONENT_DIR=${WORK_DIR}/demo-comp
 @set FLOW_PATH=${PACK_DIR}/flows/main.ygtc
 @set ARTIFACTS_DIR=${WORK_DIR}/artifacts
-@env CARGO_NET_OFFLINE=true
-
 greentic-pack new --dir ${PACK_DIR} demo-pack
 greentic-component new --name demo-comp --path ${COMPONENT_DIR} --non-interactive --no-git --no-check
 greentic-component build --manifest ${COMPONENT_DIR}/component.manifest.json
