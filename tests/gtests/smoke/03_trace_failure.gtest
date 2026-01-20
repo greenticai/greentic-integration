@@ -1,0 +1,6 @@
+#MKDIR tmp
+#WRITE tmp/trace.json <<<EOF
+{"trace":"dummy"}
+EOF
+#TRY_SAVE_TRACE tmp/trace.json
+#RUN false

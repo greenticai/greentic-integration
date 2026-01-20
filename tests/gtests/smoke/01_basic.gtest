@@ -1,0 +1,8 @@
+#SET OUT=tmp/output.txt
+#MKDIR tmp
+#WRITE ${OUT} <<<EOF
+hello
+EOF
+#RUN cat ${OUT}
+#EXPECT_EXIT 0
+#EXPECT_STDOUT_CONTAINS hello

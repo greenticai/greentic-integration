@@ -16,3 +16,4 @@ tempfile.workspace = true
 wait-timeout = "0.2"
 walkdir.workspace = true
 rayon = "1.10"
+regex.workspace = true

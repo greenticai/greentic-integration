@@ -8,17 +8,21 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
-use clap::{Parser, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use greentic_integration_core::errors::CoreError;
 use greentic_integration_core::model::{
     CommandLine, Directive, Step, StepKind, SubstitutionContext,
 };
-use greentic_integration_core::parse::parse_gtest_file;
+use greentic_integration_core::parse::parse_gtest_file as parse_legacy_gtest_file;
 use greentic_integration_core::substitute::substitute;
 use rayon::prelude::*;
 use serde::Serialize;
 use wait_timeout::ChildExt;
 use walkdir::WalkDir;
+
+mod gtest;
+mod json;
+mod junit;
 
 const STDOUT_LIMIT: usize = 1024 * 1024;
 const STDERR_LIMIT: usize = 1024 * 1024;
@@ -30,9 +34,58 @@ const TRANSCRIPT_LIMIT: usize = 8 * 1024;
     about = "Run greentic integration .gtest scripts"
 )]
 struct Cli {
+    #[command(subcommand)]
+    command: Option<CliCommand>,
+    #[command(flatten)]
+    legacy: LegacyArgs,
+}
+
+#[derive(Debug, Subcommand)]
+enum CliCommand {
+    /// Run .gtest scripts with the MVP runner
+    Run(RunArgs),
+}
+
+#[derive(Debug, Args)]
+struct RunArgs {
     /// Path to the .gtest script or directory
     #[arg(long, value_name = "PATH")]
-    test: PathBuf,
+    gtest: PathBuf,
+
+    /// Directory for per-step artifacts
+    #[arg(long, value_name = "PATH")]
+    artifacts_dir: Option<PathBuf>,
+
+    /// Write JUnit XML report to a file
+    #[arg(long, value_name = "PATH")]
+    junit: Option<PathBuf>,
+
+    /// Working directory for command execution
+    #[arg(long, value_name = "PATH")]
+    workdir: Option<PathBuf>,
+
+    /// Keep the working directory on success
+    #[arg(long)]
+    keep_workdir: bool,
+
+    /// Prepend PATH entries for spawned commands
+    #[arg(long, value_name = "PATHS")]
+    prepend_path: Option<String>,
+
+    /// Seed for deterministic failure injection
+    #[arg(long, value_name = "SEED")]
+    seed: Option<u64>,
+
+    /// Normalization config for JSON directives
+    #[arg(long, value_name = "PATH")]
+    normalize_config: Option<PathBuf>,
+}
+
+#[derive(Debug, Args)]
+struct LegacyArgs {
+    /// Path to the .gtest script or directory
+    #[arg(long, value_name = "PATH")]
+    test: Option<PathBuf>,
 
     /// Working directory for command execution
     #[arg(long, value_name = "PATH")]
@@ -200,25 +253,30 @@ struct RunOutcome {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let repo_root = cli
+    if let Some(CliCommand::Run(args)) = cli.command {
+        return run_new(args);
+    }
+    let legacy = &cli.legacy;
+    let test = legacy.test.as_ref().context("missing --test argument")?;
+    let repo_root = legacy
         .repo_root
         .clone()
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-    let tests = discover_tests(&cli.test)?;
+    let tests = discover_tests(test)?;
     if tests.is_empty() {
-        bail!("no .gtest files found under {}", cli.test.display());
+        bail!("no .gtest files found under {}", test.display());
     }
 
     let fail_fast = Arc::new(AtomicBool::new(false));
     let run_all = |tests: Vec<PathBuf>| -> Result<Vec<RunOutcome>> {
-        if cli.concurrency <= 1 {
+        if legacy.concurrency <= 1 {
             let mut outcomes = Vec::with_capacity(tests.len());
             for test in tests {
-                if cli.fail_fast && fail_fast.load(Ordering::SeqCst) {
+                if legacy.fail_fast && fail_fast.load(Ordering::SeqCst) {
                     break;
                 }
-                let outcome = run_single_test(&cli, &repo_root, &test)?;
-                if !outcome.success && cli.fail_fast {
+                let outcome = run_single_test(legacy, &repo_root, &test)?;
+                if !outcome.success && legacy.fail_fast {
                     fail_fast.store(true, Ordering::SeqCst);
                 }
                 outcomes.push(outcome);
@@ -227,7 +285,7 @@ fn main() -> Result<()> {
         }
 
         let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(cli.concurrency)
+            .num_threads(legacy.concurrency)
             .build()
             .context("failed to build thread pool")?;
         let fail_fast = fail_fast.clone();
@@ -235,11 +293,11 @@ fn main() -> Result<()> {
             tests
                 .into_par_iter()
                 .map(|test| {
-                    if cli.fail_fast && fail_fast.load(Ordering::SeqCst) {
+                    if legacy.fail_fast && fail_fast.load(Ordering::SeqCst) {
                         return Ok(None);
                     }
-                    let outcome = run_single_test(&cli, &repo_root, &test)?;
-                    if !outcome.success && cli.fail_fast {
+                    let outcome = run_single_test(legacy, &repo_root, &test)?;
+                    if !outcome.success && legacy.fail_fast {
                         fail_fast.store(true, Ordering::SeqCst);
                     }
                     Ok(Some(outcome))
@@ -256,7 +314,7 @@ fn main() -> Result<()> {
         tests: outcomes.iter().map(|o| o.report.clone()).collect(),
     };
 
-    match cli.report {
+    match legacy.report {
         ReportFormat::Text => {
             let mut combined = String::new();
             for outcome in &outcomes {
@@ -265,11 +323,11 @@ fn main() -> Result<()> {
                     combined.push('\n');
                 }
             }
-            write_report(&cli, &combined)?;
+            write_report(legacy, &combined)?;
         }
         ReportFormat::Json => {
             let payload = serde_json::to_string_pretty(&bundle)?;
-            write_report(&cli, &payload)?;
+            write_report(legacy, &payload)?;
         }
     }
 
@@ -280,7 +338,51 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn write_report(cli: &Cli, output: &str) -> Result<()> {
+fn run_new(args: RunArgs) -> Result<()> {
+    let repo_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let tests = discover_tests(&args.gtest)?;
+    if tests.is_empty() {
+        bail!("no .gtest files found under {}", args.gtest.display());
+    }
+    let normalize_config = json::normalize::load_config(args.normalize_config.as_deref())?;
+    let mut scenarios = Vec::with_capacity(tests.len());
+    for test_path in tests {
+        let scenario =
+            gtest::parse_gtest_file(&test_path).map_err(|err| anyhow::anyhow!("{err}"))?;
+        scenarios.push(scenario);
+    }
+    let results = gtest::run_scenarios(
+        scenarios,
+        gtest::RunOptions {
+            workdir: args.workdir,
+            keep_workdir: args.keep_workdir,
+            repo_root,
+            prepend_path: args.prepend_path,
+            artifacts_dir: args.artifacts_dir.clone(),
+            seed: args.seed,
+            normalize_config,
+        },
+    )?;
+    if let Some(path) = args.junit.as_ref() {
+        junit::write_junit(path, "gtest", &results)?;
+    }
+    for result in &results {
+        if result.status == gtest::ScenarioStatus::Failed
+            && let Some(hint) = result.replay_hint.as_ref()
+        {
+            println!("{hint}");
+        }
+    }
+    let any_failed = results
+        .iter()
+        .any(|result| result.status == gtest::ScenarioStatus::Failed);
+    if any_failed {
+        bail!("one or more scenarios failed");
+    }
+    Ok(())
+}
+
+fn write_report(cli: &LegacyArgs, output: &str) -> Result<()> {
     if let Some(path) = &cli.report_file {
         std::fs::write(path, output)
             .with_context(|| format!("failed to write report {}", path.display()))?;
@@ -309,8 +411,8 @@ fn discover_tests(path: &Path) -> Result<Vec<PathBuf>> {
     Ok(tests)
 }
 
-fn run_single_test(cli: &Cli, repo_root: &Path, test_path: &Path) -> Result<RunOutcome> {
-    let plan = parse_gtest_file(test_path).map_err(|err| anyhow::anyhow!("{err}"))?;
+fn run_single_test(cli: &LegacyArgs, repo_root: &Path, test_path: &Path) -> Result<RunOutcome> {
+    let plan = parse_legacy_gtest_file(test_path).map_err(|err| anyhow::anyhow!("{err}"))?;
     let test_dir = test_path
         .parent()
         .map(PathBuf::from)
@@ -469,7 +571,7 @@ fn run_single_test(cli: &Cli, repo_root: &Path, test_path: &Path) -> Result<RunO
     })
 }
 
-fn prepare_workdir(cli: &Cli, test_path: &Path) -> Result<(PathBuf, bool)> {
+fn prepare_workdir(cli: &LegacyArgs, test_path: &Path) -> Result<(PathBuf, bool)> {
     if let Some(base) = &cli.workdir {
         let name = sanitize_name(
             test_path
@@ -598,7 +700,7 @@ struct CommandRun {
 fn execute_command(
     step: &Step,
     command: &CommandLine,
-    cli: &Cli,
+    cli: &LegacyArgs,
     ctx: &mut ExecutionContext,
 ) -> Result<CommandRun> {
     let mut argv = Vec::with_capacity(command.argv.len());

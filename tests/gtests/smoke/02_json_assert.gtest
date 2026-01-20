@@ -1,0 +1,24 @@
+#MKDIR tmp
+#WRITE tmp/input.json <<<EOF
+{
+  "title": "Demo card",
+  "numbers": [1, 2, 3],
+  "a": {
+    "b": [
+      {"c": 3, "duration_ms": 5}
+    ]
+  },
+  "meta": {"trace_id": "abc", "timestamp": "2024-01-01T00:00:00Z"}
+}
+EOF
+#NORMALIZE_JSON tmp/input.json > tmp/normalized.json
+#EXPECT_JSONPATH tmp/normalized.json a.b[0].c equals 3
+#EXPECT_JSONPATH tmp/normalized.json numbers contains 2
+#EXPECT_JSONPATH tmp/normalized.json title matches ^Demo
+#EXPECT_JSONPATH tmp/normalized.json meta.trace_id not_exists
+#RUN cat tmp/input.json
+#CAPTURE_JSON > tmp/captured.json
+#EXPECT_JSONPATH tmp/captured.json a.b[0].c equals 3
+#DIFF_JSON tmp/normalized.json tmp/normalized.json
+#RUN echo hello-json
+#CAPTURE_STDOUT > tmp/hello.txt

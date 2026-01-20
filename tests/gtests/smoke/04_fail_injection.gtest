@@ -1,0 +1,8 @@
+#FAIL: drop_state_write
+#FAIL: delay_state_read 250
+#FAIL: asset_transient_failure 1/10
+#FAIL: duplicate_interaction
+#RUN python -c "import os; print(os.environ.get('GREENTIC_FAIL_DROP_STATE_WRITE')); print(os.environ.get('GREENTIC_FAIL_DELAY_STATE_READ_MS')); print(os.environ.get('GREENTIC_FAIL_ASSET_TRANSIENT')); print(os.environ.get('GREENTIC_FAIL_DUPLICATE_INTERACTION'))"
+#EXPECT_STDOUT_CONTAINS 1
+#EXPECT_STDOUT_CONTAINS 250
+#EXPECT_STDOUT_CONTAINS 1/10
