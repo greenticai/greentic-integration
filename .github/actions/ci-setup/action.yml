@@ -37,7 +37,7 @@ runs:
       shell: bash
       run: |
         if ! command -v cargo-binstall >/dev/null 2>&1; then
-          cargo install cargo-binstall --locked
+          curl -sL https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
         fi
     - name: Install greentic-dev
       shell: bash

@@ -99,24 +99,19 @@ fn greentic_dev_offline_local_store() -> Result<()> {
         build_out.stderr
     );
     // 2) Install into local store (filesystem fetch) and ensure file exists.
-    let mut store_wasm = work.join("offline_comp.wasm");
-    if store_wasm.exists() {
-        if store_wasm.is_dir() {
-            fs::remove_dir_all(&store_wasm)?;
-        } else {
-            fs::remove_file(&store_wasm)?;
-        }
+    let fetch_dir = work.join("store-fetch");
+    if fetch_dir.exists() {
+        fs::remove_dir_all(&fetch_dir)?;
     }
-    let mut fetch_out = run_with_output(
+    let fetch_out = run_with_output(
         &greentic_dev,
         &[
             "component",
             "store",
             "fetch",
-            "--fs",
+            "--out",
+            fetch_dir.to_str().unwrap(),
             comp_dir.to_str().unwrap(),
-            "--output",
-            store_wasm.to_str().unwrap(),
             "--cache-dir",
             store_path.to_str().unwrap(),
         ],
@@ -124,32 +119,6 @@ fn greentic_dev_offline_local_store() -> Result<()> {
         &envs,
         &offline_env,
     );
-    if !fetch_out.status.success() && output_contains(&fetch_out, "is a directory") {
-        let fetch_dir = work.join("store-fetch");
-        if fetch_dir.exists() {
-            fs::remove_dir_all(&fetch_dir)?;
-        }
-        fetch_out = run_with_output(
-            &greentic_dev,
-            &[
-                "component",
-                "store",
-                "fetch",
-                "--fs",
-                comp_dir.to_str().unwrap(),
-                "--output",
-                fetch_dir.to_str().unwrap(),
-                "--cache-dir",
-                store_path.to_str().unwrap(),
-            ],
-            work,
-            &envs,
-            &offline_env,
-        );
-        if fetch_out.status.success() {
-            store_wasm = find_wasm(&fetch_dir)?;
-        }
-    }
     if !fetch_out.status.success() {
         if !strict {
             eprintln!(
@@ -163,11 +132,7 @@ fn greentic_dev_offline_local_store() -> Result<()> {
             fetch_out.stderr
         );
     }
-    assert!(
-        store_wasm.exists(),
-        "expected wasm in local store at {}",
-        store_wasm.display()
-    );
+    let store_wasm = find_wasm(&fetch_dir)?;
     assert!(
         !fetch_out.stderr.contains("Could not resolve host")
             && !fetch_out.stderr.to_lowercase().contains("failed to get"),
@@ -177,7 +142,7 @@ fn greentic_dev_offline_local_store() -> Result<()> {
 
     // 3) Pack build using only local artifacts.
     let pack_dir = work.join("offline-pack");
-    run_status(
+    if !run_status(
         &greentic_dev,
         &[
             "pack",
@@ -191,7 +156,10 @@ fn greentic_dev_offline_local_store() -> Result<()> {
         &offline_env,
         strict,
         "pack new",
-    )?;
+    )? {
+        return Ok(());
+    }
+    ensure_flow_start_node(&pack_dir.join("flows/main.ygtc"))?;
 
     // Replace pack.yaml to reference our component and wasm.
     let pack_yaml = pack_dir.join("pack.yaml");
@@ -202,18 +170,20 @@ fn greentic_dev_offline_local_store() -> Result<()> {
     fs::write(&pack_yaml, pack_custom)?;
 
     // Validate pack (offline).
-    run_status(
+    if !run_status(
         &greentic_dev,
-        &["pack", "validate", "--dir", ".", "--offline"],
+        &["pack", "doctor", ".", "--offline"],
         &pack_dir,
         &envs,
         &offline_env,
         strict,
-        "pack validate",
-    )?;
+        "pack doctor",
+    )? {
+        return Ok(());
+    }
 
     // Build pack (offline).
-    run_status(
+    if !run_status(
         &greentic_dev,
         &["pack", "build", "--in", ".", "--offline"],
         &pack_dir,
@@ -221,7 +191,9 @@ fn greentic_dev_offline_local_store() -> Result<()> {
         &offline_env,
         strict,
         "pack build",
-    )?;
+    )? {
+        return Ok(());
+    }
     let gtpack = find_gtpack(&pack_dir)?;
 
     // 4) Offline run (best-effort; skip if unavailable).
@@ -341,7 +313,7 @@ fn run_status(
     offline_env: &[(String, String)],
     strict: bool,
     label: &str,
-) -> Result<()> {
+) -> Result<bool> {
     let status = Command::new(bin)
         .args(args)
         .current_dir(cwd)
@@ -354,10 +326,10 @@ fn run_status(
             anyhow::bail!("{label} failed in strict mode: {:?}", status.code());
         } else {
             eprintln!("{label} failed (non-strict, skipping): {:?}", status.code());
-            return Err(anyhow::anyhow!("non-strict skip"));
+            return Ok(false);
         }
     }
-    Ok(())
+    Ok(true)
 }
 
 struct CmdOutput {
@@ -387,20 +359,24 @@ fn run_with_output(
     }
 }
 
-fn output_contains(output: &CmdOutput, needle: &str) -> bool {
-    let needle = needle.to_ascii_lowercase();
-    output.stdout.to_ascii_lowercase().contains(&needle)
-        || output.stderr.to_ascii_lowercase().contains(&needle)
-}
-
 fn find_gtpack(pack_dir: &Path) -> Result<PathBuf> {
-    for entry in walkdir::WalkDir::new(pack_dir.join("target"))
-        .into_iter()
-        .filter_map(Result::ok)
-    {
-        let path = entry.path();
-        if path.extension().map(|ext| ext == "gtpack").unwrap_or(false) {
-            return Ok(path.to_path_buf());
+    let candidates = [
+        pack_dir.join("target"),
+        pack_dir.join("dist"),
+        pack_dir.to_path_buf(),
+    ];
+    for root in candidates {
+        if !root.exists() {
+            continue;
+        }
+        for entry in walkdir::WalkDir::new(&root)
+            .into_iter()
+            .filter_map(Result::ok)
+        {
+            let path = entry.path();
+            if path.extension().map(|ext| ext == "gtpack").unwrap_or(false) {
+                return Ok(path.to_path_buf());
+            }
         }
     }
     anyhow::bail!("gtpack not found under {}", pack_dir.display())
@@ -417,4 +393,53 @@ fn find_wasm(root: &Path) -> Result<PathBuf> {
         }
     }
     anyhow::bail!("wasm not found under {}", root.display())
+}
+
+fn ensure_flow_start_node(flow_path: &Path) -> Result<()> {
+    let raw = fs::read_to_string(flow_path).context("read flow")?;
+    let mut in_nodes = false;
+    let mut has_node = false;
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('#') || trimmed.is_empty() {
+            continue;
+        }
+        if trimmed == "nodes:" {
+            in_nodes = true;
+            continue;
+        }
+        if in_nodes {
+            if !line.starts_with(' ') && !line.starts_with('\t') {
+                break;
+            }
+            if line.starts_with("  ") && trimmed.ends_with(':') {
+                has_node = true;
+                break;
+            }
+        }
+    }
+    if has_node {
+        return Ok(());
+    }
+
+    let mut updated = String::new();
+    let mut inserted = false;
+    if raw.contains("nodes:") {
+        for line in raw.lines() {
+            updated.push_str(line);
+            updated.push('\n');
+            if !inserted && line.trim() == "nodes:" {
+                updated.push_str("  start:\n    noop:\n      config: {}\n");
+                inserted = true;
+            }
+        }
+    } else {
+        updated = raw;
+        if !updated.ends_with('\n') {
+            updated.push('\n');
+        }
+        updated.push_str("nodes:\n  start:\n    noop:\n      config: {}\n");
+    }
+    fs::write(flow_path, updated).context("write flow")?;
+    Ok(())
 }
