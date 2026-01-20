@@ -1589,10 +1589,13 @@ fn extract_failure_details(transcript: &str) -> Vec<String> {
             lines.push(trimmed.to_string());
         }
     }
-    if lines.is_empty() {
-        if let Some(last) = transcript.lines().rev().find(|line| !line.trim().is_empty()) {
-            lines.push(last.trim().to_string());
-        }
+    if lines.is_empty()
+        && let Some(last) = transcript
+            .lines()
+            .rev()
+            .find(|line| !line.trim().is_empty())
+    {
+        lines.push(last.trim().to_string());
     }
     if lines.len() > 3 {
         lines.split_off(lines.len() - 3)
