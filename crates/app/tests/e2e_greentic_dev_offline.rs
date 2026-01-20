@@ -99,7 +99,7 @@ fn greentic_dev_offline_local_store() -> Result<()> {
         build_out.stderr
     );
     // 2) Install into local store (filesystem fetch) and ensure file exists.
-    let store_wasm = work.join("offline_comp.wasm");
+    let mut store_wasm = work.join("offline_comp.wasm");
     if store_wasm.exists() {
         if store_wasm.is_dir() {
             fs::remove_dir_all(&store_wasm)?;
@@ -107,7 +107,7 @@ fn greentic_dev_offline_local_store() -> Result<()> {
             fs::remove_file(&store_wasm)?;
         }
     }
-    let fetch_out = run_with_output(
+    let mut fetch_out = run_with_output(
         &greentic_dev,
         &[
             "component",
@@ -124,6 +124,32 @@ fn greentic_dev_offline_local_store() -> Result<()> {
         &envs,
         &offline_env,
     );
+    if !fetch_out.status.success() && fetch_out.stderr.contains("Is a directory") {
+        let fetch_dir = work.join("store-fetch");
+        if fetch_dir.exists() {
+            fs::remove_dir_all(&fetch_dir)?;
+        }
+        fetch_out = run_with_output(
+            &greentic_dev,
+            &[
+                "component",
+                "store",
+                "fetch",
+                "--fs",
+                comp_dir.to_str().unwrap(),
+                "--output",
+                fetch_dir.to_str().unwrap(),
+                "--cache-dir",
+                store_path.to_str().unwrap(),
+            ],
+            work,
+            &envs,
+            &offline_env,
+        );
+        if fetch_out.status.success() {
+            store_wasm = find_wasm(&fetch_dir)?;
+        }
+    }
     if !fetch_out.status.success() {
         if !strict {
             eprintln!(
@@ -372,4 +398,17 @@ fn find_gtpack(pack_dir: &Path) -> Result<PathBuf> {
         }
     }
     anyhow::bail!("gtpack not found under {}", pack_dir.display())
+}
+
+fn find_wasm(root: &Path) -> Result<PathBuf> {
+    for entry in walkdir::WalkDir::new(root)
+        .into_iter()
+        .filter_map(Result::ok)
+    {
+        let path = entry.path();
+        if path.extension().map(|ext| ext == "wasm").unwrap_or(false) {
+            return Ok(path.to_path_buf());
+        }
+    }
+    anyhow::bail!("wasm not found under {}", root.display())
 }

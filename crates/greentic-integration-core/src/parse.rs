@@ -17,26 +17,84 @@ pub fn parse_gtest_file(path: &Path) -> Result<TestPlan, CoreError> {
 
 fn parse_gtest_contents(path: PathBuf, contents: &str) -> Result<TestPlan, CoreError> {
     let mut steps = Vec::new();
-    for (idx, raw_line) in contents.lines().enumerate() {
+    let lines: Vec<&str> = contents.lines().collect();
+    let mut idx = 0;
+    while idx < lines.len() {
+        let raw_line = lines[idx];
         let line_no = idx + 1;
         let trimmed = raw_line.trim();
         if trimmed.is_empty() || trimmed.starts_with('#') {
+            idx += 1;
             continue;
         }
         let kind = if let Some(rest) = trimmed.strip_prefix('@') {
             StepKind::Directive(parse_directive(line_no, rest, trimmed)?)
         } else {
-            StepKind::Command(CommandLine {
-                argv: tokenize_command(line_no, trimmed)?,
-            })
+            parse_command_line(line_no, trimmed, &lines, &mut idx)?
         };
         steps.push(Step {
             line_no,
             raw: raw_line.to_string(),
             kind,
         });
+        idx += 1;
     }
     Ok(TestPlan { path, steps })
+}
+
+fn parse_command_line(
+    line_no: usize,
+    trimmed: &str,
+    lines: &[&str],
+    idx: &mut usize,
+) -> Result<StepKind, CoreError> {
+    if let Some(marker_idx) = trimmed.find("<<") {
+        let remainder = trimmed[marker_idx + 2..].trim();
+        let token = remainder
+            .trim_start_matches('\'')
+            .trim_end_matches('\'')
+            .trim();
+        if token.is_empty() {
+            return Err(CoreError::ParseError {
+                line_no,
+                message: "missing heredoc terminator".to_string(),
+            });
+        }
+        let mut content_lines = Vec::new();
+        let mut cursor = *idx + 1;
+        while cursor < lines.len() {
+            let line = lines[cursor];
+            if line == token {
+                *idx = cursor;
+                let mut command = String::new();
+                command.push_str(trimmed);
+                command.push('\n');
+                command.push_str(&content_lines.join("\n"));
+                command.push('\n');
+                command.push_str(token);
+                return Ok(StepKind::Command(CommandLine {
+                    argv: wrap_shell_command(command),
+                }));
+            }
+            content_lines.push(line.to_string());
+            cursor += 1;
+        }
+        return Err(CoreError::ParseError {
+            line_no,
+            message: "missing heredoc terminator".to_string(),
+        });
+    }
+    Ok(StepKind::Command(CommandLine {
+        argv: tokenize_command(line_no, trimmed)?,
+    }))
+}
+
+fn wrap_shell_command(command: String) -> Vec<String> {
+    if cfg!(windows) {
+        vec!["cmd".to_string(), "/C".to_string(), command]
+    } else {
+        vec!["sh".to_string(), "-c".to_string(), command]
+    }
 }
 
 fn parse_directive(line_no: usize, input: &str, raw: &str) -> Result<Directive, CoreError> {
