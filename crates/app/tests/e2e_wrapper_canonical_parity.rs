@@ -198,6 +198,7 @@ fn run_wrapper(
     );
 }
 
+#[allow(dead_code)]
 fn run_cmd(
     bin: &Path,
     args: &[&str],
