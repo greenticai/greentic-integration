@@ -1,5 +1,4 @@
-[
-  {
+[]  {
     "key": "test-sess",
     "tenant": "dev",
     "team": null,
@@ -9,6 +8,6 @@
     "context": {
       "waiting": true
     },
-    "updated_at_epoch_ms": 1768985748475
+    "updated_at_epoch_ms": 1768989433429
   }
 ]
