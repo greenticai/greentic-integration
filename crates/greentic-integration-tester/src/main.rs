@@ -327,6 +327,10 @@ fn main() -> Result<()> {
         .prepend_path
         .as_ref()
         .map(|prepend| resolve_prepend_path(prepend, &cwd));
+    legacy.workdir = legacy
+        .workdir
+        .as_ref()
+        .map(|path| resolve_base_path(path, &cwd));
     let test = legacy.test.as_ref().context("missing --test argument")?;
     let repo_root = legacy.repo_root.clone().unwrap_or_else(|| cwd.clone());
     let tests = discover_tests(test)?;
@@ -410,6 +414,10 @@ fn main() -> Result<()> {
 
 fn run_new(args: RunArgs) -> Result<()> {
     let repo_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let workdir = args
+        .workdir
+        .as_ref()
+        .map(|path| resolve_base_path(path, &repo_root));
     let tests = discover_tests(&args.gtest)?;
     if tests.is_empty() {
         bail!("no .gtest files found under {}", args.gtest.display());
@@ -428,7 +436,7 @@ fn run_new(args: RunArgs) -> Result<()> {
     let results = gtest::run_scenarios(
         scenarios,
         gtest::RunOptions {
-            workdir: args.workdir,
+            workdir,
             keep_workdir: args.keep_workdir,
             repo_root,
             prepend_path,
@@ -505,6 +513,14 @@ fn resolve_prepend_path(prepend: &str, base: &Path) -> String {
         })
         .collect::<Vec<_>>()
         .join(&sep.to_string())
+}
+
+fn resolve_base_path(path: &Path, base: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        base.join(path)
+    }
 }
 
 fn run_single_test(cli: &LegacyArgs, repo_root: &Path, test_path: &Path) -> Result<RunOutcome> {
@@ -1779,6 +1795,14 @@ mod tests {
             triage_runs: 3,
             errors: false,
         }
+    }
+
+    #[test]
+    fn resolve_base_path_uses_cwd_for_relative_workdir() {
+        let dir = tempdir().expect("tempdir");
+        let base = dir.path();
+        let resolved = resolve_base_path(Path::new("."), base);
+        assert_eq!(resolved, base);
     }
 
     #[test]
