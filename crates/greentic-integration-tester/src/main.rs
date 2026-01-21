@@ -321,12 +321,14 @@ fn main() -> Result<()> {
     if let Some(CliCommand::Run(args)) = cli.command {
         return run_new(args);
     }
-    let legacy = &cli.legacy;
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let mut legacy = cli.legacy;
+    legacy.prepend_path = legacy
+        .prepend_path
+        .as_ref()
+        .map(|prepend| resolve_prepend_path(prepend, &cwd));
     let test = legacy.test.as_ref().context("missing --test argument")?;
-    let repo_root = legacy
-        .repo_root
-        .clone()
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    let repo_root = legacy.repo_root.clone().unwrap_or_else(|| cwd.clone());
     let tests = discover_tests(test)?;
     if tests.is_empty() {
         bail!("no .gtest files found under {}", test.display());
@@ -340,7 +342,7 @@ fn main() -> Result<()> {
                 if legacy.fail_fast && fail_fast.load(Ordering::SeqCst) {
                     break;
                 }
-                let outcome = run_single_test(legacy, &repo_root, &test)?;
+                let outcome = run_single_test(&legacy, &repo_root, &test)?;
                 if !outcome.success && legacy.fail_fast {
                     fail_fast.store(true, Ordering::SeqCst);
                 }
@@ -361,7 +363,7 @@ fn main() -> Result<()> {
                     if legacy.fail_fast && fail_fast.load(Ordering::SeqCst) {
                         return Ok(None);
                     }
-                    let outcome = run_single_test(legacy, &repo_root, &test)?;
+                    let outcome = run_single_test(&legacy, &repo_root, &test)?;
                     if !outcome.success && legacy.fail_fast {
                         fail_fast.store(true, Ordering::SeqCst);
                     }
@@ -388,11 +390,11 @@ fn main() -> Result<()> {
                     combined.push('\n');
                 }
             }
-            write_report(legacy, &combined)?;
+            write_report(&legacy, &combined)?;
         }
         ReportFormat::Json => {
             let payload = serde_json::to_string_pretty(&bundle)?;
-            write_report(legacy, &payload)?;
+            write_report(&legacy, &payload)?;
         }
     }
 
@@ -413,6 +415,10 @@ fn run_new(args: RunArgs) -> Result<()> {
         bail!("no .gtest files found under {}", args.gtest.display());
     }
     let normalize_config = json::normalize::load_config(args.normalize_config.as_deref())?;
+    let prepend_path = args
+        .prepend_path
+        .as_ref()
+        .map(|prepend| resolve_prepend_path(prepend, &repo_root));
     let mut scenarios = Vec::with_capacity(tests.len());
     for test_path in tests {
         let scenario =
@@ -425,7 +431,7 @@ fn run_new(args: RunArgs) -> Result<()> {
             workdir: args.workdir,
             keep_workdir: args.keep_workdir,
             repo_root,
-            prepend_path: args.prepend_path,
+            prepend_path,
             artifacts_dir: args.artifacts_dir.clone(),
             seed: args.seed,
             normalize_config,
@@ -480,6 +486,25 @@ fn discover_tests(path: &Path) -> Result<Vec<PathBuf>> {
         }
     }
     Ok(tests)
+}
+
+fn resolve_prepend_path(prepend: &str, base: &Path) -> String {
+    let sep = if cfg!(windows) { ';' } else { ':' };
+    prepend
+        .split(sep)
+        .map(|entry| {
+            if entry.is_empty() {
+                return String::new();
+            }
+            let path = Path::new(entry);
+            if path.is_absolute() {
+                entry.to_string()
+            } else {
+                base.join(path).to_string_lossy().into_owned()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(&sep.to_string())
 }
 
 fn run_single_test(cli: &LegacyArgs, repo_root: &Path, test_path: &Path) -> Result<RunOutcome> {
