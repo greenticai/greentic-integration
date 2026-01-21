@@ -330,10 +330,22 @@ fn execute_command(
         argv.push(substitute(token, &ctx.substitution, line_no)?);
     }
     let mut cmd = Command::new(&argv[0]);
+    let mut cwd = ctx.cwd.clone();
+    if argv.first().map(|arg| arg == "cargo").unwrap_or(false)
+        && !argv.iter().any(|arg| arg == "--manifest-path")
+    {
+        let local_manifest = cwd.join("Cargo.toml");
+        if !local_manifest.exists() {
+            let repo_manifest = options.repo_root.join("Cargo.toml");
+            if repo_manifest.exists() {
+                cwd = options.repo_root.clone();
+            }
+        }
+    }
     if argv.len() > 1 {
         cmd.args(&argv[1..]);
     }
-    cmd.current_dir(&ctx.cwd);
+    cmd.current_dir(&cwd);
     let mut envs: HashMap<OsString, OsString> = std::env::vars_os().collect();
     for (key, value) in &ctx.env_overrides {
         envs.insert(OsString::from(key), OsString::from(value));
