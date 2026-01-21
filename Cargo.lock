@@ -1334,7 +1334,6 @@ dependencies = [
  "flate2",
  "futures",
  "greentic-distributor-client",
- "greentic-integration-tester",
  "greentic-types",
  "humantime",
  "insta",

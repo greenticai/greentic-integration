@@ -140,6 +140,7 @@ jobs:
         run: |
           cargo build --release --target "${{ matrix.target }}" \
             -p greentic-integration \
+            -p greentic-integration-tester \
             -p greentic-integration-validator \
             -p runner-smoke
       - name: Package artifacts (unix)
@@ -161,7 +162,7 @@ jobs:
             tar -czf "dist/${name}-v${version}-${target}.tar.gz" -C dist "$(basename "$dir")"
             rm -rf "$dir"
           }
-          package greentic-integration greentic-integration pack_audit
+          package greentic-integration greentic-integration pack_audit greentic-integration-tester
           package greentic-integration-tester greentic-integration-tester
           package greentic-integration-validator greentic-integration-validator
           package runner-smoke runner-smoke
@@ -182,7 +183,7 @@ jobs:
             Compress-Archive -Path "$dir/*" -DestinationPath "dist/$name-v$version-$target.zip"
             Remove-Item -Recurse -Force $dir
           }
-          Package "greentic-integration" @("greentic-integration","pack_audit")
+          Package "greentic-integration" @("greentic-integration","pack_audit","greentic-integration-tester")
           Package "greentic-integration-tester" @("greentic-integration-tester")
           Package "greentic-integration-validator" @("greentic-integration-validator")
           Package "runner-smoke" @("runner-smoke")
