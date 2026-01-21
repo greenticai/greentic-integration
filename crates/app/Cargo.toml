@@ -47,7 +47,14 @@ tar.workspace = true
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
 humantime = "2"
 tempfile.workspace = true
+greentic-integration-core.workspace = true
+wait-timeout = "0.2"
+rayon = "1.10"
 
 [dev-dependencies]
 tower.workspace = true
 insta = "1.39.0"
+
+[[bin]]
+name = "greentic-integration-tester"
+path = "../greentic-integration-tester/src/main.rs"
