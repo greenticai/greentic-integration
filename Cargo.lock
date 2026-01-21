@@ -854,7 +854,7 @@ checksum = "d7a1e2f27636f116493b8b860f5546edb47c8d8f8ea73e1d2a20be88e28d1fea"
 
 [[package]]
 name = "deploy-plan-component"
-version = "0.4.22"
+version = "0.4.23"
 dependencies = [
  "greentic-interfaces-guest",
  "serde_json",
@@ -1320,7 +1320,7 @@ dependencies = [
 
 [[package]]
 name = "greentic-integration"
-version = "0.4.22"
+version = "0.4.23"
 dependencies = [
  "anyhow",
  "async-nats",
@@ -1334,7 +1334,7 @@ dependencies = [
  "flate2",
  "futures",
  "greentic-distributor-client",
- "greentic-integration-core",
+ "greentic-integration-tester",
  "greentic-types",
  "humantime",
  "insta",
@@ -1342,7 +1342,6 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "pathdiff",
- "rayon",
  "redis",
  "regex",
  "semver",
@@ -1362,7 +1361,6 @@ dependencies = [
  "ureq",
  "urlencoding",
  "uuid",
- "wait-timeout",
  "walkdir",
  "which",
  "zip",
@@ -1371,7 +1369,7 @@ dependencies = [
 
 [[package]]
 name = "greentic-integration-core"
-version = "0.4.22"
+version = "0.4.23"
 dependencies = [
  "serde",
  "thiserror 2.0.18",
@@ -1379,7 +1377,7 @@ dependencies = [
 
 [[package]]
 name = "greentic-integration-tester"
-version = "0.4.22"
+version = "0.4.23"
 dependencies = [
  "anyhow",
  "clap",
@@ -1395,7 +1393,7 @@ dependencies = [
 
 [[package]]
 name = "greentic-integration-validator"
-version = "0.4.22"
+version = "0.4.23"
 dependencies = [
  "anyhow",
  "clap",
@@ -2520,7 +2518,7 @@ dependencies = [
 
 [[package]]
 name = "providers-sim"
-version = "0.4.22"
+version = "0.4.23"
 dependencies = [
  "hex",
  "serde",
@@ -2928,7 +2926,7 @@ dependencies = [
 
 [[package]]
 name = "runner-smoke"
-version = "0.4.22"
+version = "0.4.23"
 dependencies = [
  "anyhow",
  "serde",

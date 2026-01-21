@@ -54,9 +54,10 @@ regex = "1"
 urlencoding = "2"
 tar = "0.4"
 greentic-integration-core = { path = "crates/greentic-integration-core", version = "0.4.13" }
+greentic-integration-tester = { path = "crates/greentic-integration-tester", version = "0.4.23" }
 [workspace.package]
 edition = "2024"
-version = "0.4.22"
+version = "0.4.23"
 description = "Greentic integration tooling and test runner"
 license = "MIT"
 repository = "https://github.com/greentic-ai/greentic-integration"
