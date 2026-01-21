@@ -140,7 +140,6 @@ jobs:
         run: |
           cargo build --release --target "${{ matrix.target }}" \
             -p greentic-integration \
-            -p greentic-integration-tester \
             -p greentic-integration-validator \
             -p runner-smoke
       - name: Package artifacts (unix)

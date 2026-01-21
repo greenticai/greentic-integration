@@ -6,6 +6,15 @@ description.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+default = ["bin"]
+bin = []
+
+[[bin]]
+name = "greentic-integration-tester"
+path = "src/main.rs"
+required-features = ["bin"]
+
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
