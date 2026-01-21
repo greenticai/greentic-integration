@@ -1,6 +1,6 @@
 @expect exit!=0
 @capture missing
 
-greentic-integration-validator file exists ${WORK_DIR}/nope.txt
+test -f ${WORK_DIR}/nope.txt
 
 @print missing

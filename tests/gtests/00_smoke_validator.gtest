@@ -131,4 +131,4 @@ test -f ${PACK_DIR}/dist/demo-pack.gtpack
 
 greentic-runner-cli --pack ${PACK_DIR}/dist/demo-pack.gtpack --input "\"hello\"" --artifacts-dir ${ARTIFACTS_DIR} --json
 test -f ${ARTIFACTS_DIR}/transcript.jsonl
-sh -c 'rg -q "ai.greentic.demo-comp" ${ARTIFACTS_DIR}/transcript.jsonl || grep -q "ai.greentic.demo-comp" ${ARTIFACTS_DIR}/transcript.jsonl'
+sh -c 'if command -v rg >/dev/null 2>&1; then rg -q "ai.greentic.demo-comp" ${ARTIFACTS_DIR}/transcript.jsonl; else grep -q "ai.greentic.demo-comp" ${ARTIFACTS_DIR}/transcript.jsonl; fi'

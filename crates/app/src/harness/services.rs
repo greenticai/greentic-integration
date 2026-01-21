@@ -65,10 +65,14 @@ impl ServiceProcess {
 
     pub fn ensure_running(&mut self) -> Result<()> {
         if let Some(status) = self.child.try_wait()? {
+            let tail = tail_log(&self.log_path, 20)
+                .unwrap_or_else(|err| format!("(failed to read log: {err})"));
             bail!(
-                "service {} exited early with status {:?}",
+                "service {} exited early with status {:?} (log: {})\n{}",
                 self.name,
-                status.code()
+                status.code(),
+                self.log_path.display(),
+                tail
             );
         }
         Ok(())
@@ -84,6 +88,16 @@ impl ServiceProcess {
         let _ = self.child.wait();
         Ok(())
     }
+}
+
+fn tail_log(path: &Path, lines: usize) -> Result<String> {
+    let contents = fs::read_to_string(path)
+        .with_context(|| format!("failed to read log {}", path.display()))?;
+    let mut out: Vec<&str> = contents.lines().collect();
+    if out.len() > lines {
+        out = out.split_off(out.len() - lines);
+    }
+    Ok(out.join("\n"))
 }
 
 pub struct TestStack {
