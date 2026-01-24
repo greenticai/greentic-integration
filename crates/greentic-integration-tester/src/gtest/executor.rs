@@ -95,6 +95,18 @@ struct ScenarioMeta {
 pub fn run_scenarios(scenarios: Vec<Scenario>, options: RunOptions) -> Result<Vec<ScenarioResult>> {
     let multi = scenarios.len() > 1;
     let mut results = Vec::with_capacity(scenarios.len());
+    let artifacts_base = options.artifacts_dir.as_ref().map(|base| {
+        if base.is_absolute() {
+            base.clone()
+        } else {
+            options.repo_root.join(base)
+        }
+    });
+    if !options.keep_artifacts
+        && let Some(base) = artifacts_base.as_ref()
+    {
+        cleanup_artifacts_root(base)?;
+    }
     for scenario in scenarios {
         println!("running {}", scenario.path.display());
         let test_root = scenario
@@ -107,20 +119,13 @@ pub fn run_scenarios(scenarios: Vec<Scenario>, options: RunOptions) -> Result<Ve
             scenario.name.as_str(),
             options.keep_workdir,
         )?;
-        let scenario_root = options.artifacts_dir.as_ref().map(|base| {
+        let scenario_root = artifacts_base.as_ref().map(|base| {
             if multi {
                 base.join(sanitize_name(&scenario.name))
             } else {
                 base.clone()
             }
         });
-        if !options.keep_artifacts
-            && let Some(dir) = &scenario_root
-            && dir.exists()
-        {
-            std::fs::remove_dir_all(dir)
-                .with_context(|| format!("failed to remove artifacts dir {}", dir.display()))?;
-        }
         let scenario_artifacts = scenario_root.as_ref().map(|dir| dir.join("artifacts"));
         if let Some(dir) = &scenario_root {
             std::fs::create_dir_all(dir)
@@ -174,6 +179,21 @@ struct ScenarioOptions {
     artifacts_dir: Option<PathBuf>,
     seed: Option<u64>,
     normalize_config: normalize::NormalizeConfig,
+}
+
+fn cleanup_artifacts_root(dir: &Path) -> Result<()> {
+    if !dir.exists() {
+        return Ok(());
+    }
+    std::fs::remove_dir_all(dir).with_context(|| {
+        format!(
+            "failed to delete existing artifacts directory {} before running gtests; \
+             remove it manually (e.g. `rm -rf {}`) or rerun with --keep-artifacts",
+            dir.display(),
+            dir.display()
+        )
+    })?;
+    Ok(())
 }
 
 fn run_scenario(scenario: &Scenario, options: &ScenarioOptions) -> Result<ScenarioResult> {
