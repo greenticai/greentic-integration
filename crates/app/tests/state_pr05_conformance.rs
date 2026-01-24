@@ -561,6 +561,9 @@ fn extract_json(output: &str) -> Result<Value> {
         loop {
             match stream.next() {
                 Some(Ok(value)) => {
+                    if contains_marker_field(&value) {
+                        return Ok(value);
+                    }
                     last_value = Some(value);
                 }
                 Some(Err(_)) => {
@@ -578,6 +581,10 @@ fn extract_json(output: &str) -> Result<Value> {
         return Ok(value);
     }
     bail!("no JSON payload found in output: {output}")
+}
+
+fn contains_marker_field(value: &Value) -> bool {
+    matches!(value.get("marker"), Some(Value::String(_)))
 }
 
 fn workspace_root() -> PathBuf {

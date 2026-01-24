@@ -320,12 +320,13 @@ fn fetch_packages(agent: &ureq::Agent, cfg: &Config) -> Result<Vec<GithubPackage
             cfg.org,
             page
         );
+        println!("fetching packages from {}", url);
         let resp = agent
             .get(&url)
             .header("Accept", "application/vnd.github+json")
             .header("Authorization", &format!("Bearer {}", cfg.github_token))
             .call()
-            .context("failed to fetch packages")?;
+            .with_context(|| format!("failed to fetch packages from {}", url))?;
         if resp.status() == 304 {
             break;
         }
@@ -426,12 +427,13 @@ fn fetch_versions(
             encoded_package,
             page
         );
+        println!("fetching versions from {}", url);
         let resp = agent
             .get(&url)
             .header("Accept", "application/vnd.github+json")
             .header("Authorization", &format!("Bearer {}", cfg.github_token))
             .call()
-            .with_context(|| format!("failed to fetch versions for {package}"))?;
+            .with_context(|| format!("failed to fetch package versions from {}", url))?;
         let body = resp
             .into_body()
             .read_to_string()
