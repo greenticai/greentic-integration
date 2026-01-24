@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail, ensure};
-use serde::Deserialize;
 use serde_json::{Value, json};
 use tempfile::tempdir;
 
@@ -550,14 +549,33 @@ fn extract_json(output: &str) -> Result<Value> {
         return Ok(value);
     }
     let bytes = output.as_bytes();
-    for (idx, byte) in bytes.iter().enumerate() {
-        if *byte != b'{' && *byte != b'[' {
+    let mut last_value = None;
+    let mut idx = 0;
+    while idx < bytes.len() {
+        let byte = bytes[idx];
+        if byte != b'{' && byte != b'[' {
+            idx += 1;
             continue;
         }
-        let mut de = serde_json::Deserializer::from_slice(&bytes[idx..]);
-        if let Ok(value) = Value::deserialize(&mut de) {
-            return Ok(value);
+        let mut stream = serde_json::Deserializer::from_slice(&bytes[idx..]).into_iter::<Value>();
+        loop {
+            match stream.next() {
+                Some(Ok(value)) => {
+                    last_value = Some(value);
+                }
+                Some(Err(_)) => {
+                    idx += stream.byte_offset().max(1);
+                    break;
+                }
+                None => {
+                    idx += stream.byte_offset().max(1);
+                    break;
+                }
+            }
         }
+    }
+    if let Some(value) = last_value {
+        return Ok(value);
     }
     bail!("no JSON payload found in output: {output}")
 }
