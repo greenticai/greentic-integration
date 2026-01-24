@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "key": "test-sess",
+    "tenant": "dev",
+    "team": null,
+    "user": "user-test",
+    "flow_id": "flow-list",
+    "node_id": "node-wait",
+    "context": {
+      "waiting": true
+    },
+    "updated_at_epoch_ms": 1769249810391
+  }
+]

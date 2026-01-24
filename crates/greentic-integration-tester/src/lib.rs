@@ -71,6 +71,10 @@ struct RunArgs {
     #[arg(long)]
     keep_workdir: bool,
 
+    /// Keep existing artifacts when rerunning a scenario
+    #[arg(long)]
+    keep_artifacts: bool,
+
     /// Prepend PATH entries for spawned commands
     #[arg(long, value_name = "PATHS")]
     prepend_path: Option<String>,
@@ -438,6 +442,7 @@ fn run_new(args: RunArgs) -> Result<()> {
         gtest::RunOptions {
             workdir,
             keep_workdir: args.keep_workdir,
+            keep_artifacts: args.keep_artifacts,
             repo_root,
             prepend_path,
             artifacts_dir: args.artifacts_dir.clone(),
@@ -524,6 +529,7 @@ fn resolve_base_path(path: &Path, base: &Path) -> PathBuf {
 }
 
 fn run_single_test(cli: &LegacyArgs, repo_root: &Path, test_path: &Path) -> Result<RunOutcome> {
+    println!("running {}", test_path.display());
     let plan = parse_legacy_gtest_file(test_path).map_err(|err| anyhow::anyhow!("{err}"))?;
     let mut outcome = run_plan(&plan, cli, repo_root, test_path, &RunConfig::default())?;
     if !outcome.success && cli.triage_flakes {

@@ -21,6 +21,7 @@ const STDERR_LIMIT: usize = 1024 * 1024;
 pub struct RunOptions {
     pub workdir: Option<PathBuf>,
     pub keep_workdir: bool,
+    pub keep_artifacts: bool,
     pub repo_root: PathBuf,
     pub prepend_path: Option<String>,
     pub artifacts_dir: Option<PathBuf>,
@@ -95,6 +96,7 @@ pub fn run_scenarios(scenarios: Vec<Scenario>, options: RunOptions) -> Result<Ve
     let multi = scenarios.len() > 1;
     let mut results = Vec::with_capacity(scenarios.len());
     for scenario in scenarios {
+        println!("running {}", scenario.path.display());
         let test_root = scenario
             .path
             .parent()
@@ -112,6 +114,13 @@ pub fn run_scenarios(scenarios: Vec<Scenario>, options: RunOptions) -> Result<Ve
                 base.clone()
             }
         });
+        if !options.keep_artifacts
+            && let Some(dir) = &scenario_root
+            && dir.exists()
+        {
+            std::fs::remove_dir_all(dir)
+                .with_context(|| format!("failed to remove artifacts dir {}", dir.display()))?;
+        }
         let scenario_artifacts = scenario_root.as_ref().map(|dir| dir.join("artifacts"));
         if let Some(dir) = &scenario_root {
             std::fs::create_dir_all(dir)
@@ -135,6 +144,21 @@ pub fn run_scenarios(scenarios: Vec<Scenario>, options: RunOptions) -> Result<Ve
                 normalize_config: options.normalize_config.clone(),
             },
         )?;
+        match result.status {
+            ScenarioStatus::Passed => println!("success {}", scenario.path.display()),
+            ScenarioStatus::Failed => {
+                if let Some(failure) = &result.failure {
+                    println!(
+                        "error {}: line {}: {}",
+                        scenario.path.display(),
+                        failure.line_no,
+                        failure.message
+                    );
+                } else {
+                    println!("error {}", scenario.path.display());
+                }
+            }
+        }
         results.push(result);
     }
     Ok(results)
@@ -169,6 +193,13 @@ fn run_scenario(scenario: &Scenario, options: &ScenarioOptions) -> Result<Scenar
         last_run_exit_checked: false,
         normalize_config: options.normalize_config.clone(),
     };
+    if let Some(dir) = ctx.artifacts_dir.as_ref() {
+        let trace_path = dir.join("trace.json");
+        ctx.env_overrides.insert(
+            "GREENTIC_TRACE_OUT".to_string(),
+            trace_path.to_string_lossy().into_owned(),
+        );
+    }
     if let Some(seed) = options.seed {
         ctx.env_overrides
             .insert("GREENTIC_FAIL_SEED".to_string(), seed.to_string());

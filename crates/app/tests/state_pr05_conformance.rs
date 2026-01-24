@@ -4,7 +4,7 @@ use std::process::Command;
 
 use anyhow::{Context, Result, bail, ensure};
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 use tempfile::tempdir;
 
 #[path = "support/mod.rs"]
@@ -69,6 +69,12 @@ fn state_pr05_conformance() -> Result<()> {
     fs::write(
         templating_pack.join(templating_flow),
         templating_flow_yaml(),
+    )?;
+    write_flow_resolution(
+        &templating_pack,
+        templating_flow,
+        "components/templating_component.wasm",
+        "conformance.templating",
     )?;
     if !build_pack(&greentic_pack, &templating_pack, strict)? {
         return Ok(());
@@ -303,23 +309,27 @@ fn write_pack_layout(
 fn templating_flow_yaml() -> &'static str {
     r#"type: job
 id: templating
+schema_version: 2
+start: start
 nodes:
   start:
-    component:
-      id: conformance.templating
-      operation: start
+    component.exec:
+      component: conformance.templating
+      op: start
       input: {}
-    routing: process
+    routing:
+      - to: process
   process:
-    component:
-      id: conformance.templating
-      operation: process
+    component.exec:
+      component: conformance.templating
+      op: process
       input:
-        user_id: {{node.start.user.id}}
-        name: {{node.start.user.name}}
-        status: {{prev.status}}
-        message: {{entry.message}}
-    routing: out
+        user_id: "{{node.start.user.id}}"
+        name: "{{node.start.user.name}}"
+        status: "{{node.start.status}}"
+        message: "{{state.input.message}}"
+    routing:
+      - out: true
 "#
 }
 
@@ -564,4 +574,91 @@ fn is_strict() -> bool {
     std::env::var("GREENTIC_INTEGRATION_STRICT")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false)
+}
+
+fn write_flow_resolution(
+    pack_dir: &Path,
+    flow_file: &str,
+    wasm_relative: &str,
+    component_id: &str,
+) -> Result<()> {
+    let flow_path = pack_dir.join(flow_file);
+    let resolve_path = flow_path.with_extension("ygtc.resolve.json");
+    let summary_path = flow_path.with_extension("ygtc.resolve.summary.json");
+    let flow_name = flow_path
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| flow_file.to_string());
+    let wasm_path = pack_dir.join(wasm_relative);
+    let digest = format!("sha256:{}", compute_sha256(&wasm_path)?);
+    let source_path = format!("file://{}", wasm_relative);
+    let resolve = json!({
+        "schema_version": 1,
+        "flow": flow_name,
+        "nodes": {
+            "start": {
+                "source": {
+                    "kind": "local",
+                    "path": source_path
+                }
+            },
+            "process": {
+                "source": {
+                    "kind": "local",
+                    "path": source_path
+                }
+            }
+        }
+    });
+    fs::write(&resolve_path, serde_json::to_string_pretty(&resolve)?)?;
+    let manifest = json!({
+        "world": "greentic:component/component@0.5.0",
+        "version": "0.1.0"
+    });
+    let summary = json!({
+        "schema_version": 1,
+        "flow": flow_name,
+        "nodes": {
+            "start": {
+                "component_id": component_id,
+                "source": {
+                    "kind": "local",
+                    "path": source_path
+                },
+                "digest": digest,
+                "manifest": manifest
+            },
+            "process": {
+                "component_id": component_id,
+                "source": {
+                    "kind": "local",
+                    "path": source_path
+                },
+                "digest": digest,
+                "manifest": manifest
+            }
+        }
+    });
+    fs::write(&summary_path, serde_json::to_string_pretty(&summary)?)?;
+    Ok(())
+}
+
+fn compute_sha256(path: &Path) -> Result<String> {
+    let output = Command::new("sha256sum")
+        .arg(path)
+        .output()
+        .with_context(|| format!("failed to run sha256sum on {}", path.display()))?;
+    if !output.status.success() {
+        bail!(
+            "sha256sum failed for {}: {:?}",
+            path.display(),
+            output.status.code()
+        );
+    }
+    let stdout = String::from_utf8(output.stdout)?;
+    let digest = stdout
+        .split_whitespace()
+        .next()
+        .context("unexpected sha256sum output")?;
+    Ok(digest.to_string())
 }
