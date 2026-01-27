@@ -1,2 +1,0 @@
-cargo:rerun-if-changed=build.rs
-cargo:rustc-env=DEBUG_OUTPUT_DIR=/projects/ai/greentic-ng/greentic-integration/crates/test-components/component-echo/crates/test-components/component-echo/target/release/build/wit-bindgen-rust-macro-43cc782066fb2c3a/out
