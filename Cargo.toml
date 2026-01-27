@@ -5,6 +5,7 @@ members = [
     "crates/greentic-integration-core",
     "crates/greentic-integration-tester",
     "crates/greentic-integration-validator",
+    "crates/test-components/component-echo",
     "crates/test-components/state-nocap-component",
     "crates/test-components/state-reader-component",
     "crates/test-components/state-writer-component",
@@ -56,7 +57,7 @@ tar = "0.4"
 greentic-integration-core = { path = "crates/greentic-integration-core", version = "0.4.13" }
 [workspace.package]
 edition = "2024"
-version = "0.4.26"
+version = "0.4.27"
 description = "Greentic integration tooling and test runner"
 license = "MIT"
 repository = "https://github.com/greentic-ai/greentic-integration"

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "flow": "main.ygtc",
+  "nodes": {
+    "echo": {
+      "component_id": "ai.greentic.component-echo",
+      "source": {
+        "kind": "local",
+        "path": "../components/ai.greentic.component-echo/component_echo.wasm"
+      },
+      "digest": "sha256:b8cdd61f821d0b02423c29f7cbe61b0f15117b135bd5e782e53fa10fb0422bf3",
+      "manifest": {
+        "world": "greentic:component/component@0.5.0",
+        "version": "0.1.0"
+      }
+    }
+  }
+}

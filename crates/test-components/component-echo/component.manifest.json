@@ -1,0 +1,360 @@
+{
+  "$schema": "https://greentic-ai.github.io/greentic-component/schemas/v1/component.manifest.schema.json",
+  "artifacts": {
+    "component_wasm": "target/wasm32-wasip2/release/component_echo.wasm"
+  },
+  "capabilities": {
+    "host": {
+      "messaging": {
+        "inbound": true,
+        "outbound": true
+      },
+      "secrets": {
+        "required": []
+      },
+      "telemetry": {
+        "scope": "node"
+      }
+    },
+    "wasi": {
+      "clocks": true,
+      "filesystem": {
+        "mode": "none",
+        "mounts": []
+      },
+      "random": true
+    }
+  },
+  "config_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {},
+    "title": "component-echo configuration",
+    "type": "object"
+  },
+  "default_operation": "messaging.send",
+  "describe_export": "get-manifest",
+  "dev_flows": {
+    "custom": {
+      "format": "flow-ir-json",
+      "graph": {
+        "description": "Auto-generated custom config for ai.greentic.component-echo",
+        "id": "ai.greentic.component-echo.custom",
+        "kind": "component-config",
+        "nodes": {
+          "ask_config": {
+            "questions": {
+              "fields": [
+                {
+                  "id": "attachments",
+                  "prompt": "Attachments:",
+                  "type": "string"
+                },
+                {
+                  "id": "channel",
+                  "prompt": "Channel:",
+                  "type": "string"
+                },
+                {
+                  "id": "id",
+                  "prompt": "Id:",
+                  "type": "string"
+                },
+                {
+                  "id": "metadata",
+                  "prompt": "Metadata:",
+                  "type": "string"
+                },
+                {
+                  "id": "session_id",
+                  "prompt": "Session Id:",
+                  "type": "string"
+                },
+                {
+                  "id": "tenant",
+                  "prompt": "Tenant:",
+                  "type": "string"
+                },
+                {
+                  "id": "text",
+                  "prompt": "Text:",
+                  "type": "string"
+                }
+              ]
+            },
+            "routing": [
+              {
+                "to": "emit_config"
+              }
+            ]
+          },
+          "emit_config": {
+            "template": "{\n  \"node_id\": \"component-echo\",\n  \"node\": {\n    \"messaging.send\": {\n      \"input\": {\n        \"attachments\": \"{{state.attachments}}\",\n        \"channel\": \"{{state.channel}}\",\n        \"id\": \"{{state.id}}\",\n        \"metadata\": \"{{state.metadata}}\",\n        \"session_id\": \"{{state.session_id}}\",\n        \"tenant\": \"{{state.tenant}}\",\n        \"text\": \"{{state.text}}\"\n      }\n    },\n    \"routing\": [\n      { \"to\": \"NEXT_NODE_PLACEHOLDER\" }\n    ]\n  }\n}"
+          }
+        }
+      }
+    },
+    "default": {
+      "format": "flow-ir-json",
+      "graph": {
+        "description": "Auto-generated default config for ai.greentic.component-echo",
+        "id": "ai.greentic.component-echo.default",
+        "kind": "component-config",
+        "nodes": {
+          "emit_config": {
+            "template": "{\n  \"node_id\": \"component-echo\",\n  \"node\": {\n    \"messaging.send\": {\n      \"input\": {\n      }\n    },\n    \"routing\": [\n      { \"to\": \"NEXT_NODE_PLACEHOLDER\" }\n    ]\n  }\n}"
+          }
+        }
+      }
+    }
+  },
+  "hashes": {
+    "component_wasm": "blake3:c8933110979b038272eebb86a43000b0d32f600b2b353de9ff42c545ef0ffdfa"
+  },
+  "id": "ai.greentic.component-echo",
+  "limits": {
+    "memory_mb": 128,
+    "wall_time_ms": 1000
+  },
+  "name": "component-echo",
+  "operations": [
+    {
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": true,
+        "description": "Any channel message payload; will be echoed unchanged.",
+        "properties": {
+          "attachments": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "tenant": {
+            "additionalProperties": true,
+            "description": "Tenanted context for the message",
+            "type": "object"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "title": "component-echo messaging send input",
+        "type": "object"
+      },
+      "name": "messaging.send",
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": true,
+        "description": "Echoes the originally received channel message payload.",
+        "properties": {
+          "attachments": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "tenant": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "title": "component-echo messaging send output",
+        "type": "object"
+      }
+    },
+    {
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": true,
+        "description": "Any channel message payload coming from the host.",
+        "properties": {
+          "attachments": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "tenant": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "title": "component-echo messaging ingress input",
+        "type": "object"
+      },
+      "name": "messaging.ingress",
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": true,
+        "description": "Echoes the originally received ingress channel message.",
+        "properties": {
+          "attachments": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "tenant": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "title": "component-echo messaging ingress output",
+        "type": "object"
+      }
+    },
+    {
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": true,
+        "description": "Direct echo invocation for pack fixtures.",
+        "properties": {
+          "attachments": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "tenant": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "title": "component-echo attached pack test input",
+        "type": "object"
+      },
+      "name": "ai.greentic.component-echo",
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": true,
+        "description": "Echoes the supplied channel message payload.",
+        "properties": {
+          "attachments": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "tenant": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "title": "component-echo attached pack test output",
+        "type": "object"
+      }
+    }
+  ],
+  "profiles": {
+    "default": "stateless",
+    "supported": [
+      "stateless"
+    ]
+  },
+  "secret_requirements": [],
+  "supports": [
+    "messaging"
+  ],
+  "version": "0.1.0",
+  "world": "greentic:component/component@0.5.0"
+}

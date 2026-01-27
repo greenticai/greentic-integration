@@ -1,0 +1,70 @@
+package provider:common@0.0.2;
+
+interface capabilities {
+  record provider-metadata {
+    provider-id: string,
+    display-name: string,
+    version: string,
+    rate-limit-hint: option<string>,
+  }
+
+  record provider-capabilities {
+    supports-threads: bool,
+    supports-buttons: bool,
+    supports-webhook-validation: bool,
+    supports-formatting-options: bool,
+  }
+
+  record provider-limits {
+    max-text-len: u32,
+    callback-data-max-bytes: u32,
+    max-buttons-per-row: u32,
+    max-button-rows: u32,
+  }
+
+  record capabilities-response {
+    metadata: provider-metadata,
+    capabilities: provider-capabilities,
+    limits: provider-limits,
+  }
+}
+
+interface render {
+  enum render-tier {
+    tier-a,
+    tier-b,
+    tier-c,
+    tier-d,
+  }
+
+  record render-warning {
+    code: string,
+    message: option<string>,
+    path: option<string>,
+  }
+
+  record render-plan {
+    tier: render-tier,
+    summary-text: option<string>,
+    actions: list<string>,
+    attachments: list<string>,
+    warnings: list<render-warning>,
+    debug-json: option<string>,
+  }
+
+  record provider-payload {
+    content-type: string,
+    body: list<u8>,
+    metadata-json: option<string>,
+  }
+
+  record encode-result {
+    payload: provider-payload,
+    warnings: list<render-warning>,
+  }
+}
+
+world common {
+  export capabilities;
+  export render;
+}

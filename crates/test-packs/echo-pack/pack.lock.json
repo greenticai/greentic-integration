@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "name": "echo___echo",
+      "ref": "file:///projects/ai/greentic-ng/greentic-integration/crates/test-packs/echo-pack/flows/../components/ai.greentic.component-echo/component_echo.wasm",
+      "digest": "sha256:b8cdd61f821d0b02423c29f7cbe61b0f15117b135bd5e782e53fa10fb0422bf3",
+      "component_id": "ai.greentic.component-echo"
+    }
+  ]
+}

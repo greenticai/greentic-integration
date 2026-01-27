@@ -55,6 +55,7 @@ jobs:
         run: |
           cargo run -p greentic-integration-tester -- --test tests/gtests/00_smoke_validator.gtest
           cargo run -p greentic-integration-tester -- --test tests/gtests/01_capture_and_expect.gtest
+          cargo run -p greentic-integration-tester -- --test tests/gtests/echo-pack-doctor.gtest
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest

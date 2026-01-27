@@ -1,0 +1,1 @@
+/projects/ai/greentic-ng/greentic-integration/crates/test-components/component-echo/crates/test-components/component-echo/target/wasm32-wasip2/release/component_echo.wasm: /projects/ai/greentic-ng/greentic-integration/crates/test-components/component-echo/component.manifest.json /projects/ai/greentic-ng/greentic-integration/crates/test-components/component-echo/src/lib.rs

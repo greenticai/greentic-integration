@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "flow": "main.ygtc",
+  "nodes": {
+    "echo": {
+      "source": {
+        "kind": "local",
+        "path": "file://../components/ai.greentic.component-echo/component_echo.wasm"
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+[package]
+name = "component-echo"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.89"
+description = "Greentic component component-echo"
+repository = "https://github.com/component-echo"
+authors = ["remote"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde_json = { workspace = true }
+greentic-interfaces-guest = { workspace = true, default-features = false, features = ["component-node"] }

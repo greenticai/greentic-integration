@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "component-echo messaging payload",
+  "description": "Echoes the originally supplied channel message payload.",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "channel": { "type": "string" },
+    "session_id": { "type": "string" },
+    "text": { "type": "string" },
+    "tenant": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

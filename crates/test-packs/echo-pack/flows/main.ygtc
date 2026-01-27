@@ -1,0 +1,17 @@
+id: echo
+type: messaging
+start: echo
+parameters: {}
+tags: []
+schema_version: 2
+entrypoints: {}
+nodes:
+  echo:
+    routing: out
+    ai.greentic.component-echo:
+      channel: webchat
+      id: echo-1
+      metadata:
+        trace_id: echo-trace
+      session_id: sess-echo
+      text: Echo test

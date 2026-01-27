@@ -1,0 +1,29 @@
+pack_id: echo-pack
+version: 0.1.0
+kind: application
+publisher: Greentic
+components:
+- id: ai.greentic.component-echo
+  version: 0.1.0
+  world: root:component/root
+  supports:
+  - messaging
+  profiles:
+    default: default
+    supported:
+    - default
+  capabilities:
+    wasi:
+      random: false
+      clocks: false
+    host: {}
+  wasm: components/ai.greentic.component-echo/component_echo.wasm
+dependencies: []
+flows:
+- id: echo
+  file: flows/main.ygtc
+  tags:
+  - default
+  entrypoints:
+  - default
+assets: []
