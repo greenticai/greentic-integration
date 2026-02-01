@@ -23,6 +23,11 @@ fn channel_message_payload_has_expected_fields() {
     assert!(payload["tenant"].is_object());
     assert!(payload["attachments"].is_array());
     assert!(payload["metadata"].is_object());
+    assert!(payload["from"].is_object());
+    assert_eq!(payload["from"]["id"], "user-1");
+    assert_eq!(payload["from"]["kind"], "user");
+    assert!(payload["to"].is_array());
+    assert!(payload["to"].as_array().unwrap().is_empty());
 }
 
 #[test]

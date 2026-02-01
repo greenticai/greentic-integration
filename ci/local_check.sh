@@ -51,7 +51,7 @@ start_server() {
   return 0
 }
 
-TOOLCHAIN="${RUST_TOOLCHAIN:-stable}"
+TOOLCHAIN="${RUST_TOOLCHAIN:-1.90.0}"
 if ! rustup toolchain list | grep -q "${TOOLCHAIN}"; then
   log "error: rustup toolchain '${TOOLCHAIN}' not installed. Run 'rustup toolchain install ${TOOLCHAIN} --profile minimal --component clippy --component rustfmt'."
   exit 1

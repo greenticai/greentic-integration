@@ -75,6 +75,7 @@ fn tenant_ctx(payload: &Value) -> Option<TenantCtx> {
         env: "test".to_string(),
         tenant: tenant.to_string(),
         tenant_id: tenant.to_string(),
+        i18n_id: None,
         team: None,
         team_id: None,
         user: None,

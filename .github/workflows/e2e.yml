@@ -24,6 +24,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.90.0
       - name: Install wasm32-wasip2 target
         run: rustup target add wasm32-wasip2
       - name: Install jq
@@ -87,6 +89,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.90.0
       - name: Install wasm32-wasip2 target
         run: rustup target add wasm32-wasip2
       - name: Install jq

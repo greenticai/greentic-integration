@@ -1,6 +1,11 @@
 {
   "channel": "webchat",
   "session_id": "sess-789",
+  "from": {
+    "id": "user-1",
+    "kind": "user"
+  },
+  "to": [],
   "text": "Build succeeded for my-service @1a2b3c (status: success)",
   "tenant": {
     "id": "tenant-123",
