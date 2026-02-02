@@ -58,7 +58,7 @@ greentic-integration-core = { path = "crates/greentic-integration-core", version
 [workspace.package]
 edition = "2024"
 rust-version = "1.90"
-version = "0.4.28"
+version = "0.4.29"
 description = "Greentic integration tooling and test runner"
 license = "MIT"
 repository = "https://github.com/greentic-ai/greentic-integration"
