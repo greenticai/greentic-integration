@@ -125,7 +125,7 @@ fn e2e_mcp_pack_smoke() -> Result<()> {
     }
 
     let template_component = std::env::var("GREENTIC_TEMPLATES_COMPONENT")
-        .unwrap_or_else(|_| "oci://ghcr.io/greentic-ai/components/templates:latest".to_string());
+        .unwrap_or_else(|_| "oci://ghcr.io/greenticai/components/templates:latest".to_string());
     let template_operation =
         std::env::var("GREENTIC_TEMPLATES_OPERATION").unwrap_or_else(|_| "render".to_string());
     let template_payload = std::env::var("GREENTIC_TEMPLATES_PAYLOAD").unwrap_or_else(|_| {
@@ -298,3 +298,4 @@ fn find_gtpack(pack_dir: &Path) -> Result<PathBuf> {
     }
     anyhow::bail!("gtpack not found under {}", pack_dir.display())
 }
+

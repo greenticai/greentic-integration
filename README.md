@@ -164,7 +164,7 @@ workspace tests, and all Make targets including packs, harnesses, and WebChat ch
 
 Use `./scripts/pin_repo.sh <org/repo> <sha>` to write a `[patch]` override into
 `.cargo/config.toml`. This lets you test unreleased dependencies (e.g.
-`./scripts/pin_repo.sh greentic-ai/greentic-messaging deadbeef`). Remove the generated section
+`./scripts/pin_repo.sh greenticai/greentic-messaging deadbeef`). Remove the generated section
 from the config (or run the script again with a new SHA) to unpin.
 
 ## Contributor Docs
@@ -238,3 +238,4 @@ Flags:
 - `RUST_LOG=info` (default) can be overridden for verbose logs
 
 On failure, the script prints the paths under `target/e2e` for quick inspection.
+
