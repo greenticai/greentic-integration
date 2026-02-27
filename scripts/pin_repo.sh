@@ -4,7 +4,7 @@ set -euo pipefail
 if [[ $# -ne 2 ]]; then
   cat <<USAGE
 Usage: $0 <github-repo> <sha>
-Example: $0 greentic-ai/greentic-messaging 0123456789abcdef
+Example: $0 greenticai/greentic-messaging 0123456789abcdef
 USAGE
   exit 2
 fi
@@ -51,3 +51,4 @@ cat <<MSG
 Pinned ${REPO_ID} to ${SHA} in ${CONFIG_FILE}.
 Run 'cargo update -p ${CRATE_NAME}' to apply, and commit the config change when sharing the pin.
 MSG
+

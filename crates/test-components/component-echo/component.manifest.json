@@ -1,5 +1,5 @@
 {
-  "$schema": "https://greentic-ai.github.io/greentic-component/schemas/v1/component.manifest.schema.json",
+  "$schema": "https://greenticai.github.io/greentic-component/schemas/v1/component.manifest.schema.json",
   "artifacts": {
     "component_wasm": "target/wasm32-wasip2/release/component_echo.wasm"
   },
@@ -358,3 +358,4 @@
   "version": "0.1.0",
   "world": "greentic:component/component@0.5.0"
 }
+

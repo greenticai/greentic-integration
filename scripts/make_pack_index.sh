@@ -6,7 +6,7 @@ RESOLVED_JSON=${RESOLVED_JSON:-target/packs_resolved.json}
 MAIN_PACK_NAME=${MAIN_PACK_NAME:-greentic-packs/messaging-dummy}
 OVERLAY_PACK_NAMES=${OVERLAY_PACK_NAMES:-greentic-packs/secrets-k8s,greentic-packs/events-dummy}
 OUT=${OUT:-target/index.json}
-GHCR_ORG=${GHCR_ORG:-greentic-ai}
+GHCR_ORG=${GHCR_ORG:-greenticai}
 
 usage() {
   cat <<'USAGE'
@@ -97,3 +97,4 @@ fi
 } >"$OUT"
 
 echo "Wrote $OUT" >&2
+

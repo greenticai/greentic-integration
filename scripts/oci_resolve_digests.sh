@@ -3,7 +3,7 @@ set -euo pipefail
 
 MANIFEST_FILE=${PACKS_MANIFEST:-tests/packs/manifest.txt}
 OUT=${OUT:-target/packs_resolved.json}
-GHCR_ORG=${GHCR_ORG:-greentic-ai}
+GHCR_ORG=${GHCR_ORG:-greenticai}
 ALLOW_LATEST=${ALLOW_LATEST:-1}
 
 usage() {
@@ -174,3 +174,4 @@ done
 printf ']\n' >>"$OUT"
 
 echo "Wrote $OUT" >&2
+
