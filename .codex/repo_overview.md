@@ -20,6 +20,9 @@
 - **Path:** `tests/` (+ `tests/compose/compose.e2e.yml`)  
   - **Role:** Tiered E2E suite.  
   - **Key functionality:** Compose NATS/Postgres infra test (`e2e_infra`), smoke harness (`e2e_smoke`), scenario DSL round-trip (`e2e_scenario_smoke`), retry/backoff flaky tool (`e2e_retry_backoff`), config+secrets precedence (`e2e_config_precedence`), pack lifecycle stub/build (`e2e_pack_lifecycle`), stack boot when binaries exist (`e2e_stack_boot`), multi-tenant isolation over NATS (`e2e_multi_tenant_isolation`), greentic-dev workflow test (`pr13_greentic_dev_e2e`), greentic-dev negative validation suite (`e2e_greentic_dev_negative`), offline/local-store workflow (`e2e_greentic_dev_offline`), greentic-dev snapshot stability (`e2e_greentic_dev_snapshot`), multi-pack shared-component test (`e2e_greentic_dev_multi_pack`), and regression runner (`e2e_regression`) that shells out to run the greentic-dev suites. Tests use isolated HOME/XDG roots, fixture distributor profile/key, and skip when greentic-dev/packc or wasm targets are unavailable. Artifacts/logs land under `target/e2e/`.
+- **Path:** `crates/app/tests/e2e_ingress_control.rs` + `scripts/build_e2e_fixtures.sh`  
+  - **Role:** Local-first ingress-control E2E scaffold for operator+runner+pack hook integration.  
+  - **Key functionality:** Ignored integration test stages local fixture packs (`control-chain`, `chat2flow`, `marker-pack`) into a temporary demo bundle, starts a local runner process, invokes `greentic-operator demo ingress` for `"refund please"` and `"hello"` paths, and asserts MARKER behavior using response-first + log fallback checks; companion script builds/copies local `.gtpack` fixtures into `fixtures/packs/` (gitignored) with env-path overrides.
 - **Path:** `fixtures/`, `packs/`, `flows/`, `samples/`  
   - **Role:** Shared data for tests and demos.  
   - **Key functionality:** Standard fixture layout (packs/config/secrets/inputs/expected), pack project/gtpack fallback (`fixtures/packs/hello`), flow definitions (`flows/chat_driven`, `flows/events_to_message`), greentic-dev fixture profile (`tests/fixtures/greentic-dev/profiles/default.toml`) and public key (`tests/fixtures/keys/ed25519_test_pub.pem`), and sample payloads consumed by tests and replay scripts.
@@ -34,6 +37,7 @@
 - **crates/app/src/main.rs:1370-1454** — Runner proxy still synthesizes events locally; external forwarding is best-effort HTTP only (no real runner API contract yet).
 - **crates/app/src/harness/pack.rs:64-115** — Pack build/verify/install still fall back to fixtures/stubs when binaries are missing; strict mode available via `GREENTIC_PACK_STRICT`.
 - **crates/app/tests/e2e_stack_boot.rs:1-40** — Test skips (or fails when `GREENTIC_STACK_STRICT=1`) if greentic binaries are absent; stack boot coverage depends on local binaries.
+- **crates/app/tests/e2e_ingress_control.rs** — New test is `#[ignore]` by default and depends on local operator/runner binaries plus fixture packs from sibling repos; assertions/inputs are environment-tunable.
 - **crates/app/tests/pr13_greentic_dev_e2e.rs** — Greentic-dev workflow test tolerates missing greentic-dev/packc binaries or `wasm32-wasip2` target by skipping steps; uses dual HOME/XDG fixture config to reduce profile lookup issues; still not a fully strict end-to-end verification without all tools installed.
 - **crates/deploy-plan-component/src/lib.rs:15-36** — Guest runtime returns an error because deploy-plan host bindings are absent; component remains a placeholder.
 

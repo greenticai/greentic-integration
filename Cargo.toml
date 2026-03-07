@@ -29,7 +29,7 @@ parking_lot = "0.12"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_with = "3"
-serde_yaml_bw = "2"
+serde_yaml_bw= {package="serde_yaml_gtc", version="2.5.2"}
 sha2 = "0.10"
 semver = { version = "1", features = ["serde"] }
 thiserror = "2"
@@ -43,7 +43,7 @@ walkdir = "2"
 tempfile = "3"
 greentic-interfaces-guest = { version = "0.4", default-features = false, features = ["component-node"] }
 greentic-types = "0.4"
-async-nats = "0.45"
+async-nats = "0.46"
 tokio-postgres = "0.7"
 futures = "0.3"
 toml = "0.9"
@@ -57,8 +57,8 @@ tar = "0.4"
 greentic-integration-core = { path = "crates/greentic-integration-core", version = "0.4.13" }
 [workspace.package]
 edition = "2024"
-rust-version = "1.90"
-version = "0.4.30"
+rust-version = "1.91"
+version = "0.4.31"
 description = "Greentic integration tooling and test runner"
 license = "MIT"
 repository = "https://github.com/greentic-ai/greentic-integration"

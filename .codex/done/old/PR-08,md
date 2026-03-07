@@ -1,0 +1,30 @@
+# PR-08 — Messaging E2E with mock provider (webhook in -> flow -> egress out) + idempotency
+
+## Goal
+Prove real messaging loop without external SaaS:
+- inbound webhook -> normalized envelope
+- routed into flow
+- egress send happens (captured by mock)
+- duplicate webhook delivery triggers dedupe / idempotency behavior
+
+## Scope
+Introduce a mock provider service used only in tests.
+
+## Implementation Plan
+1) Add `tests/mocks/mock_messaging_provider` (Rust or tiny Node, but prefer Rust):
+   - exposes `/webhook` endpoint to accept incoming message payloads
+   - exposes `/outbox` endpoint that shows captured outgoing messages
+2) In TestEnv:
+   - start mock provider process
+   - configure greentic-messaging (or relevant component) to use it
+3) Scenario:
+   - POST webhook payload
+   - await NATS / downstream invocation
+   - assert outbox contains expected outgoing message
+4) Idempotency:
+   - resend same webhook (same event id)
+   - assert outbox length unchanged OR message marked duplicate
+
+## Acceptance Criteria
+- End-to-end loop works fully locally/CI.
+- Duplicate delivery handling validated.

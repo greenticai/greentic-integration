@@ -1,0 +1,26 @@
+[
+  {
+    "id": "refund_flow",
+    "pack_id": "demo-support",
+    "target": "demo-support/refund_flow",
+    "title": "Refund Request",
+    "tags": ["refund", "billing", "chargeback"],
+    "node_ids": ["start", "collect_order", "issue_refund"]
+  },
+  {
+    "id": "shipping_flow",
+    "pack_id": "demo-ops",
+    "target": "demo-ops/shipping_flow",
+    "title": "Shipping Status",
+    "tags": ["shipping", "delivery", "tracking"],
+    "node_ids": ["start", "lookup_tracking"]
+  },
+  {
+    "id": "welcome_flow",
+    "pack_id": "demo-assistant",
+    "target": "demo-assistant/welcome_flow",
+    "title": "Hello Greeting",
+    "tags": ["hello", "hi", "greeting"],
+    "node_ids": ["start", "greet"]
+  }
+]

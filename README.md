@@ -216,6 +216,30 @@ missing:
 cargo test -p greentic-integration e2e_stack_boot
 ```
 
+Local ingress-control E2E (`e2e_ingress_control`) stages local `control-chain` + `fast2flow`
+`.gtpack` fixtures, builds a demo flow index, and routes sample chats through the local
+`greentic-fast2flow-routing-host`.
+
+```bash
+./scripts/build_e2e_fixtures.sh
+./scripts/fetch_fast2flow_release.sh
+cargo test -p greentic-integration --test e2e_ingress_control -- --nocapture
+```
+
+Environment overrides:
+- Fixture repos/files:
+  `GREENTIC_CONTROL_CHAIN_PATH`,
+  `GREENTIC_CONTROL_CHAIN_GTPACK`, `GREENTIC_FAST2FLOW_GTPACK`,
+  `GREENTIC_FAST2FLOW_FLOWS_JSON`.
+- Binary lookup:
+  `GREENTIC_FAST2FLOW_CLI_BIN`, `GREENTIC_FAST2FLOW_HOST_BIN`.
+  Default release cache:
+  `artifacts/fast2flow-release/latest/greentic-fast2flow`
+  `artifacts/fast2flow-release/latest/greentic-fast2flow-routing-host`
+- Text fixtures:
+  `GREENTIC_E2E_SCOPE`, `GREENTIC_E2E_REFUND_TEXT`, `GREENTIC_E2E_SHIPPING_TEXT`,
+  `GREENTIC_E2E_HELLO_TEXT`, `GREENTIC_E2E_UNKNOWN_TEXT`.
+
 ## E2E Test Tiers (CI)
 
 - **L0/L1 (PR)**: `e2e_smoke`, `e2e_scenario_smoke`, `e2e_retry_backoff_flaky_tool`, `e2e_config_precedence`, `e2e_pack_lifecycle`

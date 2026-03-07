@@ -5,3 +5,4 @@ webchat-e2e/test-results/
 webchat-e2e/playwright-report/
 target/e2e/
 /.direnv
+fixtures/packs/*.gtpack
