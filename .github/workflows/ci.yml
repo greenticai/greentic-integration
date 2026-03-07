@@ -32,9 +32,11 @@ jobs:
     needs: [fmt, clippy]
     env:
       GREENTIC_CONTROL_CHAIN_PATH: vendor/greentic-control-chain
-      GREENTIC_FAST2FLOW_PATH: vendor/greentic-fast2flow
-      FAST2FLOW_GH_TOKEN: ${{ secrets.GREENTIC_BIZ_GH_TOKEN != '' && secrets.GREENTIC_BIZ_GH_TOKEN || github.token }}
       CONTROL_CHAIN_GH_TOKEN: ${{ secrets.GREENTIC_GITHUB_TOKEN != '' && secrets.GREENTIC_GITHUB_TOKEN || github.token }}
+      GREENTIC_FAST2FLOW_GH_TOKEN: ${{ secrets.GREENTIC_BIZ_GH_TOKEN != '' && secrets.GREENTIC_BIZ_GH_TOKEN || github.token }}
+      GREENTIC_GITHUB_TOKEN: ${{ secrets.GREENTIC_GITHUB_TOKEN }}
+      GREENTIC_GITHUB_USER: ${{ secrets.GREENTIC_GITHUB_USER }}
+      GREENTIC_GITHUB_ORG: ${{ secrets.GREENTIC_GITHUB_ORG }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,12 +46,6 @@ jobs:
           repository: greentic-ai-org/greentic-control-chain
           path: vendor/greentic-control-chain
           token: ${{ env.CONTROL_CHAIN_GH_TOKEN }}
-      - name: Checkout greentic-fast2flow fixtures
-        uses: actions/checkout@v4
-        with:
-          repository: greentic-biz/greentic-fast2flow
-          path: vendor/greentic-fast2flow
-          token: ${{ env.FAST2FLOW_GH_TOKEN }}
       - name: Setup tooling
         uses: ./.github/actions/ci-setup
       - name: GHCR login for crane
@@ -66,10 +62,22 @@ jobs:
             exit 1
           fi
           echo "${token}" | crane auth login ghcr.io -u "${GITHUB_ACTOR:-oauth2}" --password-stdin
-      - name: Build ingress-control fixture packs
-        run: ./scripts/build_e2e_fixtures.sh
       - name: Fetch greentic-fast2flow release binaries
+        env:
+          GH_TOKEN: ${{ env.GREENTIC_FAST2FLOW_GH_TOKEN }}
+          GREENTIC_FAST2FLOW_REQUIRE_GTPACK: "1"
         run: ./scripts/fetch_fast2flow_release.sh
+      - name: Build ingress-control fixture packs
+        env:
+          GREENTIC_FAST2FLOW_GTPACK: artifacts/fast2flow-release/latest/fast2flow.gtpack
+        run: ./scripts/build_e2e_fixtures.sh
+      - name: Generate pack audit index
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GT_CRANE_LOGIN: "0"
+        run: cargo run -p greentic-integration --bin pack_audit
       - name: Run tests
         run: cargo test --all-features
   gtest:

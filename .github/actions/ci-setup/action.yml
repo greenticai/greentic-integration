@@ -67,9 +67,65 @@ runs:
         edition = "2021"
 
         [dependencies]
-        greentic-interfaces = { version = "=0.4.107", default-features = false }
+        greentic-interfaces = { version = "0.4", default-features = false }
         EOF
         cargo fetch --manifest-path "$tmp_dir/Cargo.toml"
+    - name: Materialize canonical greentic WIT siblings for crates.io guest builds
+      shell: bash
+      run: |
+        set -euo pipefail
+        cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+        registry_src_root="$(find "${cargo_home}/registry/src" -maxdepth 1 -type d -name 'index.crates.io-*' | head -n 1)"
+        if [[ -z "${registry_src_root:-}" ]]; then
+          echo "cargo registry src root not found under ${cargo_home}/registry/src" >&2
+          exit 1
+        fi
+
+        materialize_version() {
+          local version="$1"
+          local interfaces_dir="${registry_src_root}/greentic-interfaces-${version}"
+          local archive_url="https://crates.io/api/v1/crates/greentic-interfaces/${version}/download"
+          local tmp_archive
+          local tmp_unpack
+
+          if [[ -d "${interfaces_dir}/wit" ]]; then
+            echo "canonical greentic-interfaces wit already present at ${interfaces_dir}/wit"
+            return 0
+          fi
+
+          tmp_archive="$(mktemp)"
+          tmp_unpack="$(mktemp -d)"
+          curl -fsSL "${archive_url}" -o "${tmp_archive}"
+          tar -xzf "${tmp_archive}" -C "${tmp_unpack}"
+
+          local extracted_dir="${tmp_unpack}/greentic-interfaces-${version}"
+          if [[ ! -d "${extracted_dir}/wit" ]]; then
+            echo "downloaded greentic-interfaces archive missing wit/ at ${extracted_dir}" >&2
+            rm -f "${tmp_archive}"
+            rm -rf "${tmp_unpack}"
+            return 1
+          fi
+
+          rm -rf "${interfaces_dir}"
+          cp -R "${extracted_dir}" "${interfaces_dir}"
+          rm -f "${tmp_archive}"
+          rm -rf "${tmp_unpack}"
+          echo "materialized canonical wit sibling at ${interfaces_dir}"
+        }
+
+        shopt -s nullglob
+        guest_dirs=("${registry_src_root}"/greentic-interfaces-guest-*)
+        if (( ${#guest_dirs[@]} == 0 )); then
+          echo "no greentic-interfaces-guest crates unpacked yet; materializing fallback version 0.4.107"
+          materialize_version "0.4.107"
+          exit 0
+        fi
+
+        for guest_dir in "${guest_dirs[@]}"; do
+          guest_name="$(basename "${guest_dir}")"
+          version="${guest_name#greentic-interfaces-guest-}"
+          materialize_version "${version}"
+        done
     - name: Install crane
       shell: bash
       run: |
