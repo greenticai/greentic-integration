@@ -45,6 +45,12 @@ runs:
         if ! command -v greentic-dev >/dev/null 2>&1; then
           cargo binstall greentic-dev --no-confirm --force
         fi
+    - name: Install cargo-component
+      shell: bash
+      run: |
+        if ! command -v cargo-component >/dev/null 2>&1; then
+          cargo binstall cargo-component --no-confirm --force
+        fi
     - name: Install crane
       shell: bash
       run: |

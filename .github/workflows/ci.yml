@@ -30,11 +30,30 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: [fmt, clippy]
+    env:
+      GREENTIC_CONTROL_CHAIN_PATH: vendor/greentic-control-chain
+      GREENTIC_FAST2FLOW_PATH: vendor/greentic-fast2flow
+      GH_TOKEN: ${{ secrets.GREENTIC_BIZ_GH_TOKEN != '' && secrets.GREENTIC_BIZ_GH_TOKEN || github.token }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Checkout greentic-control-chain fixtures
+        uses: actions/checkout@v4
+        with:
+          repository: greentic-ai/greentic-control-chain
+          path: vendor/greentic-control-chain
+      - name: Checkout greentic-fast2flow fixtures
+        uses: actions/checkout@v4
+        with:
+          repository: greentic-biz/greentic-fast2flow
+          path: vendor/greentic-fast2flow
+          token: ${{ env.GH_TOKEN }}
       - name: Setup tooling
         uses: ./.github/actions/ci-setup
+      - name: Build ingress-control fixture packs
+        run: ./scripts/build_e2e_fixtures.sh
+      - name: Fetch greentic-fast2flow release binaries
+        run: ./scripts/fetch_fast2flow_release.sh
       - name: Run tests
         run: cargo test --all-features
   gtest:
