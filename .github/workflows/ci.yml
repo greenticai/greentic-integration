@@ -35,8 +35,8 @@ jobs:
       CONTROL_CHAIN_GH_TOKEN: ${{ secrets.GREENTIC_GITHUB_TOKEN != '' && secrets.GREENTIC_GITHUB_TOKEN || github.token }}
       GREENTIC_FAST2FLOW_GH_TOKEN: ${{ secrets.GREENTIC_BIZ_GH_TOKEN != '' && secrets.GREENTIC_BIZ_GH_TOKEN || github.token }}
       GREENTIC_GITHUB_TOKEN: ${{ secrets.GREENTIC_GITHUB_TOKEN }}
-      GREENTIC_GITHUB_USER: ${{ secrets.GREENTIC_GITHUB_USER }}
-      GREENTIC_GITHUB_ORG: ${{ secrets.GREENTIC_GITHUB_ORG }}
+      GREENTIC_GITHUB_USER: ${{ vars.GREENTIC_GITHUB_USER }}
+      GREENTIC_GITHUB_ORG: ${{ vars.GREENTIC_GITHUB_ORG }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

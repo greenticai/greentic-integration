@@ -161,8 +161,8 @@ jobs:
       - name: Pack audit
         env:
           GREENTIC_GITHUB_TOKEN: ${{ secrets.GREENTIC_GITHUB_TOKEN }}
-          GREENTIC_GITHUB_USER: ${{ secrets.GREENTIC_GITHUB_USER }}
-          GREENTIC_GITHUB_ORG: ${{ secrets.GREENTIC_GITHUB_ORG }}
+          GREENTIC_GITHUB_USER: ${{ vars.GREENTIC_GITHUB_USER }}
+          GREENTIC_GITHUB_ORG: ${{ vars.GREENTIC_GITHUB_ORG }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
@@ -173,8 +173,8 @@ jobs:
       - name: Pack audit tests
         env:
           GREENTIC_GITHUB_TOKEN: ${{ secrets.GREENTIC_GITHUB_TOKEN }}
-          GREENTIC_GITHUB_USER: ${{ secrets.GREENTIC_GITHUB_USER }}
-          GREENTIC_GITHUB_ORG: ${{ secrets.GREENTIC_GITHUB_ORG }}
+          GREENTIC_GITHUB_USER: ${{ vars.GREENTIC_GITHUB_USER }}
+          GREENTIC_GITHUB_ORG: ${{ vars.GREENTIC_GITHUB_ORG }}
         run: |
           cargo test -p greentic-integration pack_audit_ -- --nocapture
 
