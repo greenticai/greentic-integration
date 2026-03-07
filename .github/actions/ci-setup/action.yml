@@ -51,6 +51,25 @@ runs:
         if ! command -v cargo-component >/dev/null 2>&1; then
           cargo binstall cargo-component --no-confirm --force
         fi
+    - name: Prefetch canonical greentic WIT source
+      shell: bash
+      run: |
+        tmp_dir="$(mktemp -d)"
+        trap 'rm -rf "$tmp_dir"' EXIT
+        mkdir -p "$tmp_dir/src"
+        cat >"$tmp_dir/src/lib.rs" <<'EOF'
+        pub fn _prefetch_marker() {}
+        EOF
+        cat >"$tmp_dir/Cargo.toml" <<'EOF'
+        [package]
+        name = "prefetch-greentic-interfaces"
+        version = "0.0.0"
+        edition = "2021"
+
+        [dependencies]
+        greentic-interfaces = { version = "=0.4.107", default-features = false }
+        EOF
+        cargo fetch --manifest-path "$tmp_dir/Cargo.toml"
     - name: Install crane
       shell: bash
       run: |

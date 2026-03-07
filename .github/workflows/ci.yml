@@ -33,23 +33,39 @@ jobs:
     env:
       GREENTIC_CONTROL_CHAIN_PATH: vendor/greentic-control-chain
       GREENTIC_FAST2FLOW_PATH: vendor/greentic-fast2flow
-      GH_TOKEN: ${{ secrets.GREENTIC_BIZ_GH_TOKEN != '' && secrets.GREENTIC_BIZ_GH_TOKEN || github.token }}
+      FAST2FLOW_GH_TOKEN: ${{ secrets.GREENTIC_BIZ_GH_TOKEN != '' && secrets.GREENTIC_BIZ_GH_TOKEN || github.token }}
+      CONTROL_CHAIN_GH_TOKEN: ${{ secrets.GREENTIC_GITHUB_TOKEN != '' && secrets.GREENTIC_GITHUB_TOKEN || github.token }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Checkout greentic-control-chain fixtures
         uses: actions/checkout@v4
         with:
-          repository: greentic-ai/greentic-control-chain
+          repository: greentic-ai-org/greentic-control-chain
           path: vendor/greentic-control-chain
+          token: ${{ env.CONTROL_CHAIN_GH_TOKEN }}
       - name: Checkout greentic-fast2flow fixtures
         uses: actions/checkout@v4
         with:
           repository: greentic-biz/greentic-fast2flow
           path: vendor/greentic-fast2flow
-          token: ${{ env.GH_TOKEN }}
+          token: ${{ env.FAST2FLOW_GH_TOKEN }}
       - name: Setup tooling
         uses: ./.github/actions/ci-setup
+      - name: GHCR login for crane
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          token="${GHCR_TOKEN:-${GITHUB_TOKEN:-}}"
+          if [[ -z "${token}" ]]; then
+            echo "GHCR token missing; set GHCR_TOKEN or ensure GITHUB_TOKEN is available"
+            exit 1
+          fi
+          echo "${token}" | crane auth login ghcr.io -u "${GITHUB_ACTOR:-oauth2}" --password-stdin
       - name: Build ingress-control fixture packs
         run: ./scripts/build_e2e_fixtures.sh
       - name: Fetch greentic-fast2flow release binaries
