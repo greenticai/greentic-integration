@@ -61,4 +61,5 @@ rust-version = "1.91"
 version = "0.4.31"
 description = "Greentic integration tooling and test runner"
 license = "MIT"
-repository = "https://github.com/greentic-ai/greentic-integration"
+repository = "https://github.com/greenticai/greentic-integration"
+

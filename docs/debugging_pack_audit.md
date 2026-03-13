@@ -1,12 +1,12 @@
 # Debugging the pack audit (GHCR)
 
-The pack audit downloads `ghcr.io/greentic-ai/greentic-packs/*` with `crane`, decodes `manifest.cbor`, and writes `target/pack-audit/pack_index.json`.
+The pack audit downloads `ghcr.io/greenticai/greentic-packs/*` with `crane`, decodes `manifest.cbor`, and writes `target/pack-audit/pack_index.json`.
 
 ## Required auth/env
 
 ```bash
 export GITHUB_TOKEN=ghp_xxx      # token for GitHub API (packages list)
-export GITHUB_ORG=greentic-ai    # or GITHUB_USER=your-user
+export GITHUB_ORG=greenticai    # or GITHUB_USER=your-user
 ```
 
 Required GitHub Actions permissions: `packages: read` (and `contents: read`).
@@ -28,3 +28,4 @@ Useful envs:
 - `GT_PACK_AUDIT_DIR` to override `target/pack-audit`
 
 If you see `crane is not authenticated...`, rerun the login command above and ensure your token has `packages:read`.
+

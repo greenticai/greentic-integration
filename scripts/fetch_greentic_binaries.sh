@@ -9,7 +9,7 @@ set -euo pipefail
 #   CI / GREENTIC_STACK_STRICT / GREENTIC_INTEGRATION_STRICT (strict mode -> fail on missing assets/checksums)
 #   GITHUB_TOKEN (optional to avoid rate limits)
 
-OWNER="greentic-ai"
+OWNER="greenticai"
 ARCH="x86_64-unknown-linux-gnu"
 BIN_DIR="$(cd "$(dirname "$0")/.." && pwd)/tests/bin/linux-x86_64"
 mkdir -p "$BIN_DIR"
@@ -230,3 +230,4 @@ download_and_verify "greentic-deployer" "greentic-deployer" "GREENTIC_DEPLOYER_V
 download_and_verify "greentic-store" "greentic-store" "GREENTIC_STORE_VERSION" "${GREENTIC_STORE_URL:-}" "${GREENTIC_STORE_SHA256:-}"
 
 echo "Binaries available under $BIN_DIR"
+
