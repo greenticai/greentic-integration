@@ -100,7 +100,7 @@ jobs:
           cargo run -p greentic-integration-tester -- --test tests/gtests/01_capture_and_expect.gtest
           cargo run -p greentic-integration-tester -- --test tests/gtests/echo-pack-doctor.gtest
   publish:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     needs: [fmt, clippy]
     env:
@@ -141,7 +141,7 @@ jobs:
           publish runner-smoke
           publish greentic-integration
   release:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ${{ matrix.os }}
     needs: [fmt, clippy]
     strategy:
