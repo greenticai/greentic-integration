@@ -1,5 +1,5 @@
 {
-  "$schema": "https://greentic-ai.github.io/greentic-component/schemas/v1/component.manifest.schema.json",
+  "$schema": "https://greenticai.github.io/greentic-component/schemas/v1/component.manifest.schema.json",
   "artifacts": {
     "component_wasm": "component_templates.wasm"
   },
