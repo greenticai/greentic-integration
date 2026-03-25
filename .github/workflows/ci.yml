@@ -5,7 +5,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
   packages: read
 
 jobs:
@@ -144,6 +144,8 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ${{ matrix.os }}
     needs: [fmt, clippy]
+    permissions:
+      contents: write
     strategy:
       matrix:
         include:
