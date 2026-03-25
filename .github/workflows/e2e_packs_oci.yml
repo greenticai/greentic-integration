@@ -11,6 +11,9 @@ on:
       - "tests/**/*.rs"
       - "crates/app/tests/**"
 
+permissions:
+  contents: read
+
 jobs:
   e2e-packs-oci:
     runs-on: ubuntu-latest
