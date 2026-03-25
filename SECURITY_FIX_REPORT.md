@@ -1,6 +1,6 @@
 # Security Fix Report
 
-Date (UTC): 2026-03-24
+Date (UTC): 2026-03-25
 Role: Security Reviewer (CI)
 
 ## Inputs Reviewed
@@ -10,6 +10,7 @@ Role: Security Reviewer (CI)
 ## Repository / PR Dependency Review
 - Enumerated dependency manifests/lockfiles in the repository (Rust `Cargo.toml`/`Cargo.lock`, npm `package.json`/`package-lock.json`).
 - Compared branch changes against `origin/main` using `git diff --name-only origin/main...HEAD`.
+- PR diff includes only `.github/workflows/e2e_packs_oci.yml`.
 - Verified no dependency files were modified in the PR diff.
 
 ## Vulnerability Findings
