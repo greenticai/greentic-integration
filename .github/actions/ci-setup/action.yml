@@ -4,7 +4,7 @@ inputs:
   rust-toolchain:
     description: Rust toolchain version
     required: false
-    default: 1.91.0
+    default: 1.94.0
 runs:
   using: composite
   steps:
@@ -32,7 +32,7 @@ runs:
           ~/.cargo/bin
           ~/.cache/cargo-binstall
           ~/.local/bin
-        key: tools-${{ runner.os }}-v1
+        key: tools-${{ runner.os }}-v2
     - name: Install cargo-binstall
       shell: bash
       run: |
@@ -136,7 +136,9 @@ runs:
     - name: Install crane
       shell: bash
       run: |
-        if ! command -v crane >/dev/null 2>&1; then
-          curl -sL https://github.com/google/go-containerregistry/releases/download/v0.20.3/crane-linux-amd64 -o "$HOME/.local/bin/crane"
-          chmod +x "$HOME/.local/bin/crane"
+        if ! crane version >/dev/null 2>&1; then
+          tmp="$(mktemp -d)"
+          curl -fsSL "https://github.com/google/go-containerregistry/releases/download/v0.20.3/go-containerregistry_Linux_x86_64.tar.gz" -o "$tmp/crane.tar.gz"
+          tar -xzf "$tmp/crane.tar.gz" -C "$HOME/.local/bin" crane
+          rm -rf "$tmp"
         fi
