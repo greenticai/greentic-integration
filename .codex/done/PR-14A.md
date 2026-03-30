@@ -21,7 +21,7 @@ Add `scripts/oci_resolve_digests.sh`:
   - `greentic-packs/messaging-webex:0.4.10`
   - ...
 - Output: `target/packs_resolved.json` with entries:
-  - `{ "name": "greentic-packs/messaging-dummy", "tag": "0.4.10", "oci": "ghcr.io/greentic-ai/greentic-packs/messaging-dummy@sha256:..." , "digest": "sha256:..." }`
+  - `{ "name": "greentic-packs/messaging-dummy", "tag": "0.4.10", "oci": "ghcr.io/greenticai/greentic-packs/messaging-dummy@sha256:..." , "digest": "sha256:..." }`
 - Implementation:
   - Prefer `crane digest` if available; else use `skopeo inspect docker://... | jq -r .Digest`
   - Fail with clear error if neither tool exists
@@ -40,7 +40,7 @@ Add `scripts/make_pack_index.sh`:
 - Each pack entry must contain:
   - `reference.name` = pack name (string)
   - `reference.version` = tag (string)
-  - `locator` = `oci://ghcr.io/greentic-ai/<name>@<digest>` (OCI locator)
+  - `locator` = `oci://ghcr.io/greenticai/<name>@<digest>` (OCI locator)
   - `digest` = `sha256:...`
   - also include `path` for debugging (same as locator or omitted if your runner ignores it)
 - IMPORTANT:
@@ -92,3 +92,4 @@ Add a fast test `tests/pack_index_format.rs`:
 - Use only repo-local scripting (bash + jq).
 - Do not add heavy dependencies; prefer `crane`/`skopeo` optional.
 - If neither tool exists in CI image, install one in workflow (see PR-14B).
+
