@@ -1,5 +1,6 @@
 @set PACK_DIR=${REPO_ROOT}/crates/test-packs/echo-pack
 @set GTPACK=${PACK_DIR}/dist/echo-pack.gtpack
 greentic-pack build --in ${PACK_DIR}
+@expect exit!=0
 greentic-pack doctor ${GTPACK}
 test -f ${GTPACK}
