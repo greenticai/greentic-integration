@@ -95,7 +95,7 @@ runs:
 
           tmp_archive="$(mktemp)"
           tmp_unpack="$(mktemp -d)"
-          curl -fsSL "${archive_url}" -o "${tmp_archive}"
+          curl -fsSL -A "greentic-ci (https://github.com/greenticai)" "${archive_url}" -o "${tmp_archive}"
           tar -xzf "${tmp_archive}" -C "${tmp_unpack}"
 
           local extracted_dir="${tmp_unpack}/greentic-interfaces-${version}"
@@ -116,8 +116,15 @@ runs:
         shopt -s nullglob
         guest_dirs=("${registry_src_root}"/greentic-interfaces-guest-*)
         if (( ${#guest_dirs[@]} == 0 )); then
-          echo "no greentic-interfaces-guest crates unpacked yet; materializing fallback version 0.4.107"
-          materialize_version "0.4.107"
+          # Detect the version cargo fetch just downloaded instead of hardcoding
+          iface_dirs=("${registry_src_root}"/greentic-interfaces-0.*)
+          if (( ${#iface_dirs[@]} > 0 )); then
+            fallback_version="$(basename "${iface_dirs[-1]}" | sed 's/^greentic-interfaces-//')"
+          else
+            fallback_version="0.4.112"
+          fi
+          echo "no greentic-interfaces-guest crates unpacked yet; materializing fallback version ${fallback_version}"
+          materialize_version "${fallback_version}"
           exit 0
         fi
 
