@@ -5,7 +5,7 @@
 greentic-pack new --dir ${PACK_DIR} demo-pack
 greentic-component new --name demo-comp --path ${COMPONENT_DIR} --non-interactive --no-git --no-check
 greentic-component build --manifest ${COMPONENT_DIR}/component.manifest.json
-greentic-component doctor ${COMPONENT_DIR}/component.manifest.json
+greentic-component doctor --manifest ${COMPONENT_DIR}/component.manifest.json
 mkdir -p ${PACK_DIR}/components/ai.greentic.demo-comp
 cp ${COMPONENT_DIR}/target/wasm32-wasip2/release/demo_comp.wasm ${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm
 cp ${COMPONENT_DIR}/component.manifest.json ${PACK_DIR}/components/ai.greentic.demo-comp/component.manifest.json
