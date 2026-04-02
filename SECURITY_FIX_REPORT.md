@@ -6,28 +6,26 @@ Role: Security Reviewer (CI)
 
 ## 1) Alert Analysis
 
-Provided security alerts JSON:
+Input security alerts JSON analyzed in this run:
 - Dependabot alerts: `0`
 - Code scanning alerts: `0`
 
-Source verification:
-- `security-alerts.json` contains:
-  - `dependabot: []`
-  - `code_scanning: []`
-- `dependabot-alerts.json` contains `[]`.
-- `code-scanning-alerts.json` contains `[]`.
+Evidence:
+- `security-alerts.json` => `{ "dependabot": [], "code_scanning": [] }`
+- `dependabot-alerts.json` => `[]`
+- `code-scanning-alerts.json` => `[]`
 
-Conclusion:
-- No actionable vulnerabilities are present in the provided alert feeds.
+Assessment:
+- No actionable vulnerabilities were present in the provided alert feeds.
 
 ## 2) Remediation Actions
 
 Minimal, safe fixes applied:
 - None required.
 
-Reason:
-- No Dependabot findings to patch.
-- No code scanning findings to remediate.
+Rationale:
+- There were no dependency vulnerabilities to patch.
+- There were no code scanning findings to remediate.
 
 ## 3) Files Changed
 
