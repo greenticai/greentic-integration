@@ -116,8 +116,18 @@ runs:
         shopt -s nullglob
         guest_dirs=("${registry_src_root}"/greentic-interfaces-guest-*)
         if (( ${#guest_dirs[@]} == 0 )); then
-          echo "no greentic-interfaces-guest crates unpacked yet; materializing fallback version 0.4.107"
-          materialize_version "0.4.107"
+          # No guest crates unpacked — derive version from the non-guest
+          # greentic-interfaces crate that cargo fetch already downloaded.
+          iface_dirs=("${registry_src_root}"/greentic-interfaces-0.*)
+          if (( ${#iface_dirs[@]} > 0 )); then
+            fallback_version="$(basename "${iface_dirs[-1]}")"
+            fallback_version="${fallback_version#greentic-interfaces-}"
+            echo "no greentic-interfaces-guest crates unpacked yet; materializing from fetched version ${fallback_version}"
+            materialize_version "${fallback_version}"
+          else
+            echo "error: no greentic-interfaces crate found in registry cache" >&2
+            exit 1
+          fi
           exit 0
         fi
 
