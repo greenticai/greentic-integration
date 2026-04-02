@@ -1,3 +1,4 @@
+.github/actions/ci-setup/action.yml
 .github/workflows/ci.yml
 .github/workflows/codeql.yml
 .github/workflows/codex-security-fix.yml
@@ -6,3 +7,5 @@
 .github/workflows/e2e_packs_oci.yml
 .github/workflows/integration.yml
 .github/workflows/nightly.yml
+all-code-scanning-alerts.json
+pr-changed-files.txt
