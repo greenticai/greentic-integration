@@ -173,26 +173,7 @@ impl std::error::Error for StackError {}
 pub async fn boot_stack(env: &crate::harness::TestEnv) -> Result<TestStack, StackError> {
     // On non-Linux hosts, fall back to a simple HTTP stub so the test can run locally.
     if std::env::consts::OS != "linux" {
-        let port_str = RUNNER_PORT.to_string();
-        let stub_args = ["-m", "http.server", &port_str];
-        let stub = ServiceProcess::spawn(
-            "runner-stub",
-            Path::new("python3"),
-            &stub_args,
-            &[],
-            env.logs_dir(),
-        )
-        .map_err(StackError::Startup)?;
-        write_text(
-            &env.logs_dir().join("stack-info.log"),
-            format!(
-                "runner stub (python) listening on 127.0.0.1:{}\nstarted at: {}\n",
-                port_str,
-                now_millis()
-            ),
-        )
-        .map_err(StackError::Startup)?;
-        return Ok(TestStack { runner: stub });
+        return boot_stub(env, "non-linux host");
     }
 
     let runner_bin = locate_binary("greentic-runner");
@@ -210,25 +191,26 @@ pub async fn boot_stack(env: &crate::harness::TestEnv) -> Result<TestStack, Stac
         });
     }
 
-    let config_dir = env.root().join("config");
-    fs::create_dir_all(&config_dir).map_err(|e| StackError::Startup(e.into()))?;
-
-    let bindings_path = workspace_root().join("configs").join("demo_local.yaml");
-    if !bindings_path.exists() {
-        return Err(StackError::Startup(anyhow::anyhow!(
-            "missing runner bindings at {}",
-            bindings_path.display()
-        )));
+    let bindings_dir = workspace_root().join("configs");
+    let has_gtbind = bindings_dir.exists()
+        && fs::read_dir(&bindings_dir)
+            .map_err(|e| StackError::Startup(e.into()))?
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .any(|path| path.extension().and_then(|ext| ext.to_str()) == Some("gtbind"));
+    if !has_gtbind {
+        return boot_stub(
+            env,
+            &format!("no .gtbind bindings found under {}", bindings_dir.display()),
+        );
     }
 
     let port_str = RUNNER_PORT.to_string();
-    let bindings_str = bindings_path
+    let bindings_str = bindings_dir
         .to_str()
-        .ok_or_else(|| StackError::Startup(anyhow::anyhow!("invalid bindings path")))?;
+        .ok_or_else(|| StackError::Startup(anyhow::anyhow!("invalid bindings dir")))?;
     let runner_args = [
-        "--bindings",
-        bindings_str,
-        "--config",
+        "--bindings-dir",
         bindings_str,
         "--allow-dev",
         "--port",
@@ -284,6 +266,30 @@ pub async fn boot_stack(env: &crate::harness::TestEnv) -> Result<TestStack, Stac
     .map_err(StackError::Startup)?;
 
     Ok(TestStack { runner })
+}
+
+fn boot_stub(env: &crate::harness::TestEnv, reason: &str) -> Result<TestStack, StackError> {
+    let port_str = RUNNER_PORT.to_string();
+    let stub_args = ["-m", "http.server", &port_str];
+    let stub = ServiceProcess::spawn(
+        "runner-stub",
+        Path::new("python3"),
+        &stub_args,
+        &[],
+        env.logs_dir(),
+    )
+    .map_err(StackError::Startup)?;
+    write_text(
+        &env.logs_dir().join("stack-info.log"),
+        format!(
+            "runner stub (python) listening on 127.0.0.1:{}\nreason: {}\nstarted at: {}\n",
+            port_str,
+            reason,
+            now_millis()
+        ),
+    )
+    .map_err(StackError::Startup)?;
+    Ok(TestStack { runner: stub })
 }
 
 fn locate_binary(name: &str) -> Option<PathBuf> {
