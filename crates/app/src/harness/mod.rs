@@ -84,7 +84,8 @@ impl TestEnv {
         let nats_host_port = env.service_host_port("nats", NATS_CONTAINER_PORT)?;
         let postgres_host_port = env.service_host_port("postgres", POSTGRES_CONTAINER_PORT)?;
         env.nats_url = format!("nats://127.0.0.1:{nats_host_port}");
-        env.db_url = format!("postgres://postgres:postgres@127.0.0.1:{postgres_host_port}/postgres");
+        env.db_url =
+            format!("postgres://postgres:postgres@127.0.0.1:{postgres_host_port}/postgres");
 
         let snapshot = EnvSnapshot::capture(&env.name, &env.root, &env.nats_url, &env.db_url)?;
         write_json(&env.root.join("env.json"), &snapshot)?;
@@ -234,7 +235,13 @@ impl TestEnv {
         let nats_port = parse_port(&self.nats_url, "nats")?;
         let postgres_port = parse_port(&self.db_url, "postgres")?;
         wait_for_port("nats", nats_port, &self.logs_dir, Duration::from_secs(30)).await?;
-        wait_for_port("postgres", postgres_port, &self.logs_dir, Duration::from_secs(40)).await?;
+        wait_for_port(
+            "postgres",
+            postgres_port,
+            &self.logs_dir,
+            Duration::from_secs(40),
+        )
+        .await?;
         Ok(())
     }
 
