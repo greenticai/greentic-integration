@@ -1,0 +1,23 @@
+package greentic:component@0.6.0;
+
+interface component-descriptor {
+    get-component-info: func() -> list<u8>;
+    describe: func() -> list<u8>;
+}
+
+interface component-qa {
+    enum qa-mode {
+        default,
+        setup,
+        update,
+        remove,
+    }
+
+    qa-spec: func(mode: qa-mode) -> list<u8>;
+    apply-answers: func(mode: qa-mode, current-config: list<u8>, answers: list<u8>) -> list<u8>;
+}
+
+world descriptor-world {
+    export component-descriptor;
+    export component-qa;
+}

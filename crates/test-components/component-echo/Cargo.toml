@@ -3,7 +3,7 @@ name = "component-echo"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
-rust-version = "1.91"
+rust-version = "1.94"
 description = "Greentic component component-echo"
 repository = "https://github.com/component-echo"
 authors = ["remote"]
@@ -12,5 +12,10 @@ authors = ["remote"]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+serde_cbor = { workspace = true }
+ciborium = { workspace = true }
+sha2 = { workspace = true }
+wit-bindgen = { workspace = true }
 greentic-interfaces-guest = { workspace = true, default-features = false, features = ["component-node"] }

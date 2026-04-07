@@ -51,7 +51,7 @@ start_server() {
   return 0
 }
 
-TOOLCHAIN="${RUST_TOOLCHAIN:-1.91.0}"
+TOOLCHAIN="${RUST_TOOLCHAIN:-1.94.0}"
 if ! rustup toolchain list | grep -q "${TOOLCHAIN}"; then
   log "error: rustup toolchain '${TOOLCHAIN}' not installed. Run 'rustup toolchain install ${TOOLCHAIN} --profile minimal --component clippy --component rustfmt'."
   exit 1
@@ -65,6 +65,7 @@ export GREENTIC_PROVIDER_CORE_ONLY="${GREENTIC_PROVIDER_CORE_ONLY:-1}"
 run_step "cargo fmt" "${CARGO_CMD[@]}" fmt -- --check
 run_step "cargo clippy" "${CARGO_CMD[@]}" clippy --all-targets --all-features -- -D warnings
 run_step "cargo test" "${CARGO_CMD[@]}" test --workspace
+run_step "regen echo-pack gtpack" "${ROOT_DIR}/crates/test-packs/echo-pack/regen-pack.sh"
 run_step "make packs.test" make packs.test
 run_step "make render.snapshot" make render.snapshot
 run_step "make runner.smoke" make runner.smoke

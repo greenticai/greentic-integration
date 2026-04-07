@@ -29,7 +29,7 @@ notify.workspace = true
 ureq.workspace = true
 once_cell.workspace = true
 greentic-types.workspace = true
-greentic-distributor-client.workspace = true
+greentic-distributor-client = { workspace = true, features = ["pack-fetch"] }
 async-nats.workspace = true
 tokio-postgres.workspace = true
 futures.workspace = true
@@ -44,7 +44,7 @@ flate2.workspace = true
 zstd.workspace = true
 urlencoding.workspace = true
 tar.workspace = true
-zip.workspace = true
+zip = { workspace = true, default-features = false, features = ["deflate"] }
 humantime.workspace = true
 tempfile.workspace = true
 
