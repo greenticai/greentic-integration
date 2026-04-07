@@ -3,6 +3,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -21,8 +22,8 @@ pub use pack::{BuildMode, PackBuildResult, PackInstallResult, PackVerifyResult, 
 pub mod config_layers;
 pub use config_layers::{ConfigLayers, SecretCheck, apply_secrets, load_toml, merge_json};
 
-const NATS_PORT: u16 = 4223;
-const POSTGRES_PORT: u16 = 55432;
+const NATS_CONTAINER_PORT: u16 = 4222;
+const POSTGRES_CONTAINER_PORT: u16 = 5432;
 
 /// Lightweight E2E environment harness that boots Docker Compose dependencies, exposes service
 /// URLs, and captures logs/artifacts (preserved on failure).
@@ -63,22 +64,15 @@ impl TestEnv {
         }
 
         let project_name = format!("greentic_e2e_{}", sanitize(&name));
-        let nats_url = format!("nats://127.0.0.1:{NATS_PORT}");
-        let db_url = format!("postgres://postgres:postgres@127.0.0.1:{POSTGRES_PORT}/postgres");
-
-        let snapshot = EnvSnapshot::capture(&name, &root, &nats_url, &db_url)?;
-        write_json(&root.join("env.json"), &snapshot)?;
-        write_text(&logs_dir.join("READY"), "ok\n")?;
-
-        let env = Self {
+        let mut env = Self {
             name,
             root,
             logs_dir,
             artifacts_dir,
             compose_file,
             project_name,
-            nats_url,
-            db_url,
+            nats_url: String::new(),
+            db_url: String::new(),
             shutdown: false,
         };
 
@@ -87,6 +81,16 @@ impl TestEnv {
 
         env.append_log("starting compose stack")?;
         env.compose_up()?;
+        let nats_host_port = env.service_host_port("nats", NATS_CONTAINER_PORT)?;
+        let postgres_host_port = env.service_host_port("postgres", POSTGRES_CONTAINER_PORT)?;
+        env.nats_url = format!("nats://127.0.0.1:{nats_host_port}");
+        env.db_url =
+            format!("postgres://postgres:postgres@127.0.0.1:{postgres_host_port}/postgres");
+
+        let snapshot = EnvSnapshot::capture(&env.name, &env.root, &env.nats_url, &env.db_url)?;
+        write_json(&env.root.join("env.json"), &snapshot)?;
+        write_text(&env.logs_dir.join("READY"), "ok\n")?;
+
         env.append_log("compose stack up; waiting for ports")?;
         env.wait_for_ports().await?;
         env.append_log("ports ready; waiting for services")?;
@@ -199,11 +203,41 @@ impl TestEnv {
         );
     }
 
+    fn service_host_port(&self, service: &str, container_port: u16) -> Result<u16> {
+        let output = Command::new("docker")
+            .arg("compose")
+            .arg("-f")
+            .arg(&self.compose_file)
+            .arg("port")
+            .arg(service)
+            .arg(container_port.to_string())
+            .env("COMPOSE_PROJECT_NAME", &self.project_name)
+            .current_dir(workspace_root())
+            .output()
+            .context("failed to execute docker compose port")?;
+
+        if !output.status.success() {
+            bail!(
+                "docker compose port {} {} failed (code {:?}): {}",
+                service,
+                container_port,
+                output.status.code(),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        parse_compose_port(stdout.trim())
+            .with_context(|| format!("failed to parse docker compose port output for {service}"))
+    }
+
     async fn wait_for_ports(&self) -> Result<()> {
-        wait_for_port("nats", NATS_PORT, &self.logs_dir, Duration::from_secs(30)).await?;
+        let nats_port = parse_port(&self.nats_url, "nats")?;
+        let postgres_port = parse_port(&self.db_url, "postgres")?;
+        wait_for_port("nats", nats_port, &self.logs_dir, Duration::from_secs(30)).await?;
         wait_for_port(
             "postgres",
-            POSTGRES_PORT,
+            postgres_port,
             &self.logs_dir,
             Duration::from_secs(40),
         )
@@ -373,6 +407,31 @@ fn sanitize(input: &str) -> String {
         }
     }
     out.trim_matches('_').to_string()
+}
+
+fn parse_port(url: &str, label: &str) -> Result<u16> {
+    let authority = url
+        .split_once("://")
+        .map(|(_, rest)| rest)
+        .unwrap_or(url)
+        .split('/')
+        .next()
+        .unwrap_or(url);
+    let port = authority
+        .rsplit_once(':')
+        .map(|(_, port)| port)
+        .ok_or_else(|| anyhow::anyhow!("missing port in {label} url: {url}"))?;
+    let port = port.trim_end_matches("/tcp").trim();
+    u16::from_str(port).with_context(|| format!("invalid {label} url port in {url}"))
+}
+
+fn parse_compose_port(output: &str) -> Result<u16> {
+    let port = output
+        .rsplit_once(':')
+        .map(|(_, port)| port)
+        .ok_or_else(|| anyhow::anyhow!("missing port in compose output: {output}"))?;
+    let port = port.trim_end_matches("/tcp").trim();
+    u16::from_str(port).with_context(|| format!("invalid compose port: {output}"))
 }
 
 fn workspace_root() -> PathBuf {

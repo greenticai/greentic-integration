@@ -8,7 +8,7 @@ COMPOSE ?= docker compose
 STACK_FILE := compose/stack.yml
 
 .PHONY: help stack-up stack-down packs.test runner.smoke render.snapshot webchat.e2e dev.min dev.full webchat.contract golden.update app.test
-.PHONY: test.all
+.PHONY: e2e.fixtures test.all
 
 help: ## Show available commands
 	@printf "\nGreentic Integration Make targets\n\n"
@@ -40,7 +40,25 @@ webchat.contract: ## Run WebChat backend contract tests (PR-INT-07)
 webchat.e2e: ## Run WebChat Playwright E2E suite (PR-INT-08)
 	@$(SCRIPTS_DIR)/run_webchat_e2e.sh
 
-test.all: ## Run full integration test suite (packs + app + smoke + renderer + webchat)
+e2e.fixtures: ## Stage ingress-control fixture packs used by app and nightly E2E
+	@set -euo pipefail; \
+	if [[ -f fixtures/packs/control-chain.gtpack && -f fixtures/packs/fast2flow.gtpack ]]; then \
+	  echo "using existing fixtures/packs/control-chain.gtpack"; \
+	  echo "using existing fixtures/packs/fast2flow.gtpack"; \
+	  exit 0; \
+	fi; \
+	if [[ -z "$${GREENTIC_CONTROL_CHAIN_PATH:-}" ]]; then \
+	  if [[ -d vendor/greentic-control-chain ]]; then \
+	    export GREENTIC_CONTROL_CHAIN_PATH=vendor/greentic-control-chain; \
+	  else \
+	    export GREENTIC_CONTROL_CHAIN_PATH=../greentic-control-chain; \
+	  fi; \
+	fi; \
+	GREENTIC_FAST2FLOW_REQUIRE_GTPACK=1 $(SCRIPTS_DIR)/fetch_fast2flow_release.sh; \
+	GREENTIC_FAST2FLOW_GTPACK=artifacts/fast2flow-release/latest/fast2flow.gtpack \
+		$(SCRIPTS_DIR)/build_e2e_fixtures.sh
+
+test.all: e2e.fixtures ## Run full integration test suite (packs + app + smoke + renderer + webchat)
 	@set -euo pipefail; \
 	$(MAKE) packs.test; \
 	$(MAKE) app.test; \
