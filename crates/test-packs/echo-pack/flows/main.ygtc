@@ -9,6 +9,7 @@ nodes:
   echo:
     routing: out
     ai.greentic.component-echo:
+      operation: messaging.send
       channel: webchat
       id: echo-1
       metadata:

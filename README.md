@@ -216,9 +216,9 @@ missing:
 cargo test -p greentic-integration e2e_stack_boot
 ```
 
-Local ingress-control E2E (`e2e_ingress_control`) stages local `control-chain` + `fast2flow`
-`.gtpack` fixtures, builds a demo flow index, and routes sample chats through the local
-`greentic-fast2flow-routing-host`.
+Local ingress-control E2E (`e2e_ingress_control`) stages repo-local `.gtpack` fixtures, builds a
+demo flow index, and routes sample chats through the local `greentic-fast2flow-routing-host`.
+The test skips locally when the cached fast2flow binaries are for an incompatible platform.
 
 ```bash
 ./scripts/build_e2e_fixtures.sh
@@ -227,8 +227,7 @@ cargo test -p greentic-integration --test e2e_ingress_control -- --nocapture
 ```
 
 Environment overrides:
-- Fixture repos/files:
-  `GREENTIC_CONTROL_CHAIN_PATH`,
+- Fixture files:
   `GREENTIC_CONTROL_CHAIN_GTPACK`, `GREENTIC_FAST2FLOW_GTPACK`,
   `GREENTIC_FAST2FLOW_FLOWS_JSON`.
 - Binary lookup:

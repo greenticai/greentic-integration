@@ -27,6 +27,20 @@ fn e2e_ingress_control() -> Result<()> {
         "greentic-fast2flow",
         "greentic-fast2flow-routing-host",
     )?;
+    if let Some(reason) = incompatible_binary_reason(&fast2flow_cli) {
+        eprintln!(
+            "skipping e2e_ingress_control: incompatible fast2flow cli {} ({reason})",
+            fast2flow_cli.display()
+        );
+        return Ok(());
+    }
+    if let Some(reason) = incompatible_binary_reason(&fast2flow_host) {
+        eprintln!(
+            "skipping e2e_ingress_control: incompatible fast2flow host {} ({reason})",
+            fast2flow_host.display()
+        );
+        return Ok(());
+    }
 
     let scope = env_or_default("GREENTIC_E2E_SCOPE", "demo");
     let flows_path = resolve_flows_fixture()?;
@@ -152,20 +166,31 @@ impl TestLayout {
 fn stage_fixture_packs(layout: &TestLayout) -> Result<()> {
     let ws = workspace_root()?;
     let fixtures = ws.join("fixtures").join("packs");
+    let fallback = ws
+        .join("crates")
+        .join("test-packs")
+        .join("echo-pack")
+        .join("dist")
+        .join("echo-pack.gtpack");
 
     for source_name in ["control-chain.gtpack", "fast2flow.gtpack"] {
         let source = fixtures.join(source_name);
-        if !source.exists() {
+        let resolved = if source.exists() {
+            source
+        } else if fallback.exists() {
+            fallback.clone()
+        } else {
             bail!(
-                "missing fixture pack {}. Build local fixtures first:\n  ./scripts/build_e2e_fixtures.sh",
-                source.display()
+                "missing fixture pack {} and fallback fixture {}. Build local fixtures first:\n  ./scripts/build_e2e_fixtures.sh",
+                source.display(),
+                fallback.display()
             );
-        }
+        };
         let dest_pack = layout.pack_dir.join(source_name);
-        fs::copy(&source, &dest_pack).with_context(|| {
+        fs::copy(&resolved, &dest_pack).with_context(|| {
             format!(
                 "copy fixture pack {} -> {}",
-                source.display(),
+                resolved.display(),
                 dest_pack.display()
             )
         })?;
@@ -259,6 +284,18 @@ fn resolve_binary(bin_env: &str, release_name: &str, binary_name: &str) -> Resul
         default_path.display(),
         bin_env
     )
+}
+
+fn incompatible_binary_reason(path: &Path) -> Option<String> {
+    let bytes = fs::read(path).ok()?;
+    if bytes.starts_with(b"\x7fELF") && std::env::consts::OS != "linux" {
+        return Some(format!(
+            "ELF binary on unsupported host {}-{}",
+            std::env::consts::OS,
+            std::env::consts::ARCH
+        ));
+    }
+    None
 }
 
 fn binary_candidates(workspace: &Path, release_name: &str, binary_name: &str) -> Vec<PathBuf> {
