@@ -53,20 +53,15 @@ jobs:
           token: ${{ env.CONTROL_CHAIN_GH_TOKEN }}
       - name: Setup tooling
         uses: ./.github/actions/ci-setup
-      - name: GHCR login for crane
-        shell: bash
+      - name: GHCR login
+        uses: docker/login-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-          GITHUB_ACTOR: ${{ github.actor }}
-        run: |
-          set -euo pipefail
-          token="${GHCR_TOKEN:-${GITHUB_TOKEN:-}}"
-          if [[ -z "${token}" ]]; then
-            echo "GHCR token missing; set GHCR_TOKEN or ensure GITHUB_TOKEN is available"
-            exit 1
-          fi
-          echo "${token}" | crane auth login ghcr.io -u "${GITHUB_ACTOR:-oauth2}" --password-stdin
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ env.GHCR_TOKEN != '' && env.GHCR_TOKEN || env.GITHUB_TOKEN }}
       - name: Fetch greentic-fast2flow release binaries
         env:
           GH_TOKEN: ${{ env.GREENTIC_FAST2FLOW_GH_TOKEN }}
@@ -116,7 +111,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.91.0
+          toolchain: 1.94.0
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
       - name: Publish crates
@@ -172,7 +167,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.91.0
+          toolchain: 1.94.0
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
       - name: Install target
