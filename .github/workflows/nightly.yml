@@ -31,6 +31,13 @@ jobs:
       - name: Setup tooling
         uses: ./.github/actions/ci-setup
 
+      - name: Ensure wasm32-wasip2 target
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup target add wasm32-wasip2
+          rustup target list --installed | grep -Fx wasm32-wasip2
+
       - name: Install greentic CLIs
         shell: bash
         run: |
@@ -133,6 +140,13 @@ jobs:
 
       - name: Setup tooling
         uses: ./.github/actions/ci-setup
+
+      - name: Ensure wasm32-wasip2 target
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup target add wasm32-wasip2
+          rustup target list --installed | grep -Fx wasm32-wasip2
 
       - name: Install greentic CLIs
         shell: bash
