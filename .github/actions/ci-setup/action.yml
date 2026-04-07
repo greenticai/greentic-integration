@@ -4,7 +4,7 @@ inputs:
   rust-toolchain:
     description: Rust toolchain version
     required: false
-    default: 1.91.0
+    default: 1.94.0
 runs:
   using: composite
   steps:
@@ -23,6 +23,12 @@ runs:
       with:
         toolchain: ${{ inputs.rust-toolchain }}
         targets: wasm32-wasip2
+    - name: Ensure wasm32-wasip2 target is installed
+      shell: bash
+      run: |
+        set -euo pipefail
+        rustup target add wasm32-wasip2
+        rustup target list --installed | grep -Fx wasm32-wasip2
     - name: Cache cargo
       uses: Swatinem/rust-cache@v2
     - name: Cache tools
