@@ -38,7 +38,7 @@ runs:
           ~/.cargo/bin
           ~/.cache/cargo-binstall
           ~/.local/bin
-        key: tools-${{ runner.os }}-v1
+        key: tools-${{ runner.os }}-v2
     - name: Install cargo-binstall
       shell: bash
       run: |
@@ -147,7 +147,8 @@ runs:
       run: |
         set -euo pipefail
         mkdir -p "$HOME/.local/bin"
-        if ! command -v crane >/dev/null 2>&1; then
+        if ! command -v crane >/dev/null 2>&1 || ! crane version >/dev/null 2>&1; then
+          rm -f "$HOME/.local/bin/crane"
           tmpdir="$(mktemp -d)"
           trap 'rm -rf "$tmpdir"' EXIT
           curl -fsSL https://github.com/google/go-containerregistry/releases/download/v0.20.3/go-containerregistry_Linux_x86_64.tar.gz \
