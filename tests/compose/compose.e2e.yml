@@ -6,8 +6,12 @@ services:
       - --server_name=greentic-e2e
       - --http_port=9223
     ports:
-      - "4223:4222"
-      - "9223:9223"
+      - target: 4222
+        published: 0
+        host_ip: 127.0.0.1
+      - target: 9223
+        published: 0
+        host_ip: 127.0.0.1
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9223/healthz || exit 1"]
       interval: 5s
@@ -22,7 +26,9 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
     ports:
-      - "55432:5432"
+      - target: 5432
+        published: 0
+        host_ip: 127.0.0.1
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

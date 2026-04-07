@@ -187,8 +187,18 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - lint
+    env:
+      GREENTIC_CONTROL_CHAIN_PATH: vendor/greentic-control-chain
+      CONTROL_CHAIN_GH_TOKEN: ${{ secrets.GREENTIC_GITHUB_TOKEN != '' && secrets.GREENTIC_GITHUB_TOKEN || github.token }}
+      GREENTIC_FAST2FLOW_GH_TOKEN: ${{ secrets.GREENTIC_BIZ_GH_TOKEN != '' && secrets.GREENTIC_BIZ_GH_TOKEN || github.token }}
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout greentic-control-chain fixtures
+        uses: actions/checkout@v4
+        with:
+          repository: greentic-ai-org/greentic-control-chain
+          path: vendor/greentic-control-chain
+          token: ${{ env.CONTROL_CHAIN_GH_TOKEN }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.91.0
@@ -202,6 +212,10 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
+      - name: Stage ingress-control fixture packs
+        env:
+          GH_TOKEN: ${{ env.GREENTIC_FAST2FLOW_GH_TOKEN }}
+        run: make e2e.fixtures
       - name: Install Node.js for webchat
         uses: actions/setup-node@v4
         with:
