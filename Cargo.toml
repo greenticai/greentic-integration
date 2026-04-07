@@ -43,6 +43,8 @@ walkdir = "2"
 tempfile = "3"
 greentic-interfaces-guest = { version = "0.4", default-features = false, features = ["component-node"] }
 greentic-types = "0.4"
+ciborium = "0.2.2"
+serde_cbor = "0.11.2"
 async-nats = "0.46"
 tokio-postgres = "0.7"
 futures = "0.3"

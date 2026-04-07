@@ -2,6 +2,7 @@
 name = "greentic-integration-tester"
 version.workspace = true
 edition.workspace = true
+default-run = "greentic-integration-tester"
 description.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -19,6 +20,8 @@ required-features = ["bin"]
 anyhow.workspace = true
 clap.workspace = true
 greentic-integration-core.workspace = true
+greentic-types = { workspace = true, features = ["std"] }
+serde_cbor.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 tempfile.workspace = true
@@ -26,3 +29,4 @@ wait-timeout = "0.2"
 walkdir.workspace = true
 rayon = "1.10"
 regex.workspace = true
+ciborium.workspace = true

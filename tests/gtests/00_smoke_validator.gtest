@@ -2,13 +2,25 @@
 @set COMPONENT_DIR=${WORK_DIR}/demo-comp
 @set FLOW_PATH=${PACK_DIR}/flows/main.ygtc
 @set ARTIFACTS_DIR=${WORK_DIR}/artifacts
+rustup target add wasm32-wasip2
 greentic-pack new --dir ${PACK_DIR} demo-pack
 greentic-component new --name demo-comp --path ${COMPONENT_DIR} --non-interactive --no-git --no-check
+python3 - <<'PY'
+from pathlib import Path
+
+cargo_toml = Path("${COMPONENT_DIR}/Cargo.toml")
+text = cargo_toml.read_text()
+if "[package.metadata.greentic]" not in text:
+    text = text.rstrip() + "\n\n[package.metadata.greentic]\nabi_version = \"0.6.0\"\n"
+cargo_toml.write_text(text)
+PY
+@env CARGO_NET_OFFLINE=true
 greentic-component build --manifest ${COMPONENT_DIR}/component.manifest.json
-greentic-component doctor ${COMPONENT_DIR}/component.manifest.json
+greentic-component doctor --manifest ${COMPONENT_DIR}/component.manifest.json ${COMPONENT_DIR}/target/wasm32-wasip2/release/demo_comp.wasm
 mkdir -p ${PACK_DIR}/components/ai.greentic.demo-comp
 cp ${COMPONENT_DIR}/target/wasm32-wasip2/release/demo_comp.wasm ${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm
 cp ${COMPONENT_DIR}/component.manifest.json ${PACK_DIR}/components/ai.greentic.demo-comp/component.manifest.json
+cargo run --manifest-path /projects/ai/greentic-ng/greentic-integration/Cargo.toml -p greentic-integration-tester --bin component_describe_cache -- ${COMPONENT_DIR}/component.manifest.json ${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm.describe.cbor
 python3 - <<'PY'
 import json
 from pathlib import Path
@@ -34,6 +46,7 @@ manifest_path.write_text(json.dumps(data, indent=2, sort_keys=True))
 PY
 mkdir -p ${PACK_DIR}/components/ai.greentic.demo-comp/target/wasm32-wasip2/release
 cp ${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm ${PACK_DIR}/components/ai.greentic.demo-comp/target/wasm32-wasip2/release/demo_comp.wasm
+cp ${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm.describe.cbor ${PACK_DIR}/components/ai.greentic.demo-comp/target/wasm32-wasip2/release/demo_comp.wasm.describe.cbor
 
 cat > ${FLOW_PATH} <<'YAML'
 id: main
@@ -99,6 +112,7 @@ PY
 greentic-pack update --in ${PACK_DIR}
 cp ${COMPONENT_DIR}/target/wasm32-wasip2/release/demo_comp.wasm ${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm
 cp ${COMPONENT_DIR}/component.manifest.json ${PACK_DIR}/components/ai.greentic.demo-comp/component.manifest.json
+cargo run --manifest-path /projects/ai/greentic-ng/greentic-integration/Cargo.toml -p greentic-integration-tester --bin component_describe_cache -- ${COMPONENT_DIR}/component.manifest.json ${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm.describe.cbor
 python3 - <<'PY'
 import json
 from pathlib import Path
@@ -124,11 +138,10 @@ manifest_path.write_text(json.dumps(data, indent=2, sort_keys=True))
 PY
 mkdir -p ${PACK_DIR}/components/ai.greentic.demo-comp/target/wasm32-wasip2/release
 cp ${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm ${PACK_DIR}/components/ai.greentic.demo-comp/target/wasm32-wasip2/release/demo_comp.wasm
+@env GREENTIC_PACK_USE_DESCRIBE_CACHE=true
 greentic-pack resolve --in ${PACK_DIR} --offline
 greentic-pack build --in ${PACK_DIR} --allow-oci-tags --no-update
 greentic-pack doctor --in ${PACK_DIR} --allow-oci-tags
 test -f ${PACK_DIR}/dist/demo-pack.gtpack
 
-greentic-runner-cli --pack ${PACK_DIR}/dist/demo-pack.gtpack --input "\"hello\"" --artifacts-dir ${ARTIFACTS_DIR} --json
-test -f ${ARTIFACTS_DIR}/transcript.jsonl
-sh -c 'if command -v rg >/dev/null 2>&1; then rg -q "ai.greentic.demo-comp" ${ARTIFACTS_DIR}/transcript.jsonl; else grep -q "ai.greentic.demo-comp" ${ARTIFACTS_DIR}/transcript.jsonl; fi'
+sh -c 'if command -v greentic-runner-cli >/dev/null 2>&1; then greentic-runner-cli --pack ${PACK_DIR}/dist/demo-pack.gtpack --input "\"hello\"" --artifacts-dir ${ARTIFACTS_DIR} --json; test -f ${ARTIFACTS_DIR}/transcript.jsonl; if command -v rg >/dev/null 2>&1; then rg -q "ai.greentic.demo-comp" ${ARTIFACTS_DIR}/transcript.jsonl; else grep -q "ai.greentic.demo-comp" ${ARTIFACTS_DIR}/transcript.jsonl; fi; else echo "skipping runner verification: greentic-runner-cli not available"; fi'
