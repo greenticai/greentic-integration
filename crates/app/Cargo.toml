@@ -8,7 +8,7 @@ repository.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-async-trait = "0.1"
+async-trait.workspace = true
 axum.workspace = true
 camino.workspace = true
 clap.workspace = true
@@ -29,7 +29,7 @@ notify.workspace = true
 ureq.workspace = true
 once_cell.workspace = true
 greentic-types.workspace = true
-greentic-distributor-client = { version = "0.4", features = ["pack-fetch"] }
+greentic-distributor-client.workspace = true
 async-nats.workspace = true
 tokio-postgres.workspace = true
 futures.workspace = true
@@ -39,15 +39,15 @@ pathdiff.workspace = true
 which.workspace = true
 walkdir.workspace = true
 redis.workspace = true
-regex = "1"
-flate2 = "1"
-zstd = "0.13"
+regex.workspace = true
+flate2.workspace = true
+zstd.workspace = true
 urlencoding.workspace = true
 tar.workspace = true
-zip = { version = "0.6", default-features = false, features = ["deflate"] }
-humantime = "2"
+zip.workspace = true
+humantime.workspace = true
 tempfile.workspace = true
 
 [dev-dependencies]
 tower.workspace = true
-insta = "1.39.0"
+insta.workspace = true
