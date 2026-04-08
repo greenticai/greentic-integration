@@ -3,9 +3,65 @@
 @set FLOW_PATH=${PACK_DIR}/flows/main.ygtc
 @set ARTIFACTS_DIR=${WORK_DIR}/artifacts
 greentic-pack new --dir ${PACK_DIR} demo-pack
-greentic-component new --name demo-comp --path ${COMPONENT_DIR} --non-interactive --no-git --no-check
-greentic-component build --manifest ${COMPONENT_DIR}/component.manifest.json
-greentic-component doctor ${COMPONENT_DIR}/component.manifest.json
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+create_answers = {
+    "wizard_id": "greentic-component.wizard.run",
+    "schema_id": "greentic-component.wizard.run",
+    "schema_version": "1.0.0",
+    "answers": {
+        "mode": "create",
+        "fields": {
+            "component_name": "demo-comp",
+            "output_dir": "${COMPONENT_DIR}",
+            "advanced_setup": False,
+            "abi_version": "0.6.0",
+            "operation_names": "handle_message",
+            "filesystem_mode": "none",
+            "telemetry_scope": "node",
+        },
+    },
+}
+Path("${WORK_DIR}/component-create.answers.json").write_text(
+    json.dumps(create_answers, indent=2, sort_keys=True)
+)
+
+build_answers = {
+    "wizard_id": "greentic-component.wizard.run",
+    "schema_id": "greentic-component.wizard.run",
+    "schema_version": "1.0.0",
+    "answers": {
+        "mode": "build-test",
+        "fields": {
+            "project_root": "${COMPONENT_DIR}",
+            "full_tests": False,
+        },
+    },
+}
+Path("${WORK_DIR}/component-build.answers.json").write_text(
+    json.dumps(build_answers, indent=2, sort_keys=True)
+)
+
+doctor_answers = {
+    "wizard_id": "greentic-component.wizard.run",
+    "schema_id": "greentic-component.wizard.run",
+    "schema_version": "1.0.0",
+    "answers": {
+        "mode": "doctor",
+        "fields": {
+            "project_root": "${COMPONENT_DIR}",
+        },
+    },
+}
+Path("${WORK_DIR}/component-doctor.answers.json").write_text(
+    json.dumps(doctor_answers, indent=2, sort_keys=True)
+)
+PY
+greentic-component wizard apply --answers ${WORK_DIR}/component-create.answers.json
+greentic-component wizard apply --answers ${WORK_DIR}/component-build.answers.json
+greentic-component wizard apply --answers ${WORK_DIR}/component-doctor.answers.json
 mkdir -p ${PACK_DIR}/components/ai.greentic.demo-comp
 cp ${COMPONENT_DIR}/target/wasm32-wasip2/release/demo_comp.wasm ${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm
 cp ${COMPONENT_DIR}/component.manifest.json ${PACK_DIR}/components/ai.greentic.demo-comp/component.manifest.json
