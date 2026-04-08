@@ -117,17 +117,26 @@ pub fn ensure_tool(
         .stderr(std::process::Stdio::inherit())
         .status()
         .context(format!("failed to spawn cargo binstall for {label}"))?;
-    if status.success()
-        && let Ok(path) = which(binary)
-    {
-        return Ok(Some(path));
+    if status.success() {
+        if let Ok(path) = which(binary) {
+            return Ok(Some(path));
+        }
+        if let Some(path) = cargo_bin_path(binary) {
+            return Ok(Some(path));
+        }
     }
 
     if strict {
-        anyhow::bail!("{label} missing and cargo binstall failed");
+        anyhow::bail!(
+            "{label} missing after cargo binstall (status {:?}); PATH={} CARGO_HOME={:?} HOME={:?}",
+            status.code(),
+            std::env::var("PATH").unwrap_or_default(),
+            std::env::var("CARGO_HOME").ok(),
+            std::env::var("HOME").ok()
+        );
     } else {
         eprintln!(
-            "skipping {label}: {} not found and cargo binstall failed (status {:?})",
+            "skipping {label}: {} still not resolvable after cargo binstall (status {:?})",
             binary,
             status.code()
         );
