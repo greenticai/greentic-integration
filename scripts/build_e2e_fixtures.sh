@@ -10,21 +10,27 @@ LOCAL_FALLBACK_GTPACK="${ROOT_DIR}/crates/test-packs/echo-pack/dist/echo-pack.gt
 mkdir -p "${OUT_DIR}"
 
 log() {
-  printf '[build_e2e_fixtures] %s\n' "$*"
+  printf '[build_e2e_fixtures] %s\n' "$*" >&2
 }
 
 resolve_control_chain() {
   if [[ -n "${CONTROL_CHAIN_GTPACK}" ]]; then
-    printf '%s\n' "${CONTROL_CHAIN_GTPACK}"
-    return 0
+    if [[ -f "${CONTROL_CHAIN_GTPACK}" ]]; then
+      printf '%s\n' "${CONTROL_CHAIN_GTPACK}"
+      return 0
+    fi
+    log "warn: control-chain override not found at ${CONTROL_CHAIN_GTPACK}; using local fallback"
   fi
   printf '%s\n' "${LOCAL_FALLBACK_GTPACK}"
 }
 
 resolve_fast2flow() {
   if [[ -n "${FAST2FLOW_GTPACK}" ]]; then
-    printf '%s\n' "${FAST2FLOW_GTPACK}"
-    return 0
+    if [[ -f "${FAST2FLOW_GTPACK}" ]]; then
+      printf '%s\n' "${FAST2FLOW_GTPACK}"
+      return 0
+    fi
+    log "warn: fast2flow override not found at ${FAST2FLOW_GTPACK}; using local fallback"
   fi
   printf '%s\n' "${LOCAL_FALLBACK_GTPACK}"
 }
