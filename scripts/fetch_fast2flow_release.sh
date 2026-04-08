@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_ROOT="${GREENTIC_FAST2FLOW_RELEASE_DIR:-${ROOT_DIR}/artifacts/fast2flow-release}"
 REPO="${GREENTIC_FAST2FLOW_GH_REPO:-greentic-biz/greentic-fast2flow}"
 REQUIRE_GTPACK="${GREENTIC_FAST2FLOW_REQUIRE_GTPACK:-0}"
+ALLOW_MISSING_RELEASE="${GREENTIC_FAST2FLOW_ALLOW_MISSING_RELEASE:-1}"
 
 mkdir -p "${OUT_ROOT}"
 
@@ -45,7 +46,19 @@ case "${os}" in
     ;;
 esac
 
-tag="$(gh release view --repo "${REPO}" --json tagName -q .tagName)"
+if ! tag="$(gh release view --repo "${REPO}" --json tagName -q .tagName 2>/dev/null)"; then
+  if [[ "${ALLOW_MISSING_RELEASE}" == "1" ]]; then
+    log "warn: release not found for ${REPO}; leaving fast2flow release artifacts unresolved"
+    mkdir -p "${OUT_ROOT}/latest"
+    cat > "${OUT_ROOT}/latest/env.sh" <<EOF
+export GREENTIC_FAST2FLOW_RELEASE_VERSION=""
+EOF
+    exit 0
+  fi
+  log "error: release not found for ${REPO}"
+  exit 1
+fi
+
 version="${tag#v}"
 target="${target_arch}-${target_os}"
 release_dir="${OUT_ROOT}/${tag}"
