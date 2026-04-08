@@ -112,7 +112,7 @@ pub fn ensure_tool(
     }
 
     let status = Command::new("cargo")
-        .args(["binstall", crate_name, "--no-confirm"])
+        .args(["binstall", crate_name, "--no-confirm", "--force"])
         .stdout(std::process::Stdio::inherit())
         .stderr(std::process::Stdio::inherit())
         .status()
