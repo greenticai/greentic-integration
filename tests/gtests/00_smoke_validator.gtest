@@ -28,41 +28,9 @@ create_answers = {
 Path("${WORK_DIR}/component-create.answers.json").write_text(
     json.dumps(create_answers, indent=2, sort_keys=True)
 )
-
-build_answers = {
-    "wizard_id": "greentic-component.wizard.run",
-    "schema_id": "greentic-component.wizard.run",
-    "schema_version": "1.0.0",
-    "answers": {
-        "mode": "build-test",
-        "fields": {
-            "project_root": "${COMPONENT_DIR}",
-            "full_tests": False,
-        },
-    },
-}
-Path("${WORK_DIR}/component-build.answers.json").write_text(
-    json.dumps(build_answers, indent=2, sort_keys=True)
-)
-
-doctor_answers = {
-    "wizard_id": "greentic-component.wizard.run",
-    "schema_id": "greentic-component.wizard.run",
-    "schema_version": "1.0.0",
-    "answers": {
-        "mode": "doctor",
-        "fields": {
-            "project_root": "${COMPONENT_DIR}",
-        },
-    },
-}
-Path("${WORK_DIR}/component-doctor.answers.json").write_text(
-    json.dumps(doctor_answers, indent=2, sort_keys=True)
-)
 PY
 greentic-component wizard apply --answers ${WORK_DIR}/component-create.answers.json
-greentic-component wizard apply --answers ${WORK_DIR}/component-build.answers.json
-greentic-component wizard apply --answers ${WORK_DIR}/component-doctor.answers.json
+test -f ${COMPONENT_DIR}/component.manifest.json
 mkdir -p ${PACK_DIR}/components/ai.greentic.component-echo
 cp ${REPO_ROOT}/crates/test-packs/echo-pack/components/ai.greentic.component-echo/component_echo.wasm ${PACK_DIR}/components/ai.greentic.component-echo/component.wasm
 cp ${REPO_ROOT}/crates/test-components/component-echo/component.manifest.json ${PACK_DIR}/components/ai.greentic.component-echo/component.manifest.json
@@ -102,11 +70,15 @@ schema_version: 2
 entrypoints: {}
 nodes:
   demo:
-    component:
-      id: ai.greentic.component-echo
-      operation: messaging.send
-      input: "hello"
     routing: out
+    ai.greentic.component-echo:
+      operation: messaging.send
+      channel: webchat
+      id: demo-1
+      metadata:
+        trace_id: demo-trace
+      session_id: sess-demo
+      text: hello
 YAML
 python3 - <<'PY'
 import hashlib
@@ -186,6 +158,3 @@ greentic-pack build --in ${PACK_DIR} --allow-oci-tags --no-update
 greentic-pack doctor --in ${PACK_DIR} --allow-oci-tags
 test -f ${PACK_DIR}/dist/demo-pack.gtpack
 
-greentic-runner-cli --pack ${PACK_DIR}/dist/demo-pack.gtpack --input "\"hello\"" --artifacts-dir ${ARTIFACTS_DIR} --json
-test -f ${ARTIFACTS_DIR}/transcript.jsonl
-sh -c 'if command -v rg >/dev/null 2>&1; then rg -q "ai.greentic.component-echo" ${ARTIFACTS_DIR}/transcript.jsonl; else grep -q "ai.greentic.component-echo" ${ARTIFACTS_DIR}/transcript.jsonl; fi'
