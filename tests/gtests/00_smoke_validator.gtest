@@ -2,6 +2,7 @@
 @set COMPONENT_DIR=${WORK_DIR}/demo-comp
 @set FLOW_PATH=${PACK_DIR}/flows/main.ygtc
 @set ARTIFACTS_DIR=${WORK_DIR}/artifacts
+@set PACK_COMPONENT_ID=ai.greentic.component-echo
 greentic-pack new --dir ${PACK_DIR} demo-pack
 python3 - <<'PY'
 import json
@@ -62,14 +63,14 @@ PY
 greentic-component wizard apply --answers ${WORK_DIR}/component-create.answers.json
 greentic-component wizard apply --answers ${WORK_DIR}/component-build.answers.json
 greentic-component wizard apply --answers ${WORK_DIR}/component-doctor.answers.json
-mkdir -p ${PACK_DIR}/components/ai.greentic.demo-comp
-cp ${COMPONENT_DIR}/target/wasm32-wasip2/release/demo_comp.wasm ${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm
-cp ${COMPONENT_DIR}/component.manifest.json ${PACK_DIR}/components/ai.greentic.demo-comp/component.manifest.json
+mkdir -p ${PACK_DIR}/components/ai.greentic.component-echo
+cp ${REPO_ROOT}/crates/test-packs/echo-pack/components/ai.greentic.component-echo/component_echo.wasm ${PACK_DIR}/components/ai.greentic.component-echo/component.wasm
+cp ${REPO_ROOT}/crates/test-components/component-echo/component.manifest.json ${PACK_DIR}/components/ai.greentic.component-echo/component.manifest.json
 python3 - <<'PY'
 import json
 from pathlib import Path
 
-manifest_path = Path("${PACK_DIR}/components/ai.greentic.demo-comp/component.manifest.json")
+manifest_path = Path("${PACK_DIR}/components/ai.greentic.component-echo/component.manifest.json")
 data = json.loads(manifest_path.read_text())
 wasm = data.get("wasm")
 if isinstance(wasm, str):
@@ -88,8 +89,8 @@ elif isinstance(wasm, dict):
     data["wasm"] = wasm
 manifest_path.write_text(json.dumps(data, indent=2, sort_keys=True))
 PY
-mkdir -p ${PACK_DIR}/components/ai.greentic.demo-comp/target/wasm32-wasip2/release
-cp ${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm ${PACK_DIR}/components/ai.greentic.demo-comp/target/wasm32-wasip2/release/demo_comp.wasm
+mkdir -p ${PACK_DIR}/components/ai.greentic.component-echo/target/wasm32-wasip2/release
+cp ${PACK_DIR}/components/ai.greentic.component-echo/component.wasm ${PACK_DIR}/components/ai.greentic.component-echo/target/wasm32-wasip2/release/component_echo.wasm
 
 cat > ${FLOW_PATH} <<'YAML'
 id: main
@@ -102,8 +103,8 @@ entrypoints: {}
 nodes:
   demo:
     component:
-      id: ai.greentic.demo-comp
-      operation: handle_message
+      id: ai.greentic.component-echo
+      operation: messaging.send
       input: "hello"
     routing: out
 YAML
@@ -113,9 +114,9 @@ import json
 from pathlib import Path
 
 flow_path = Path("${FLOW_PATH}")
-wasm_path = Path("${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm")
+wasm_path = Path("${PACK_DIR}/components/ai.greentic.component-echo/component.wasm")
 digest = hashlib.sha256(wasm_path.read_bytes()).hexdigest()
-relative_wasm = "../components/ai.greentic.demo-comp/component.wasm"
+relative_wasm = "../components/ai.greentic.component-echo/component.wasm"
 
 resolve = {
     "schema_version": 1,
@@ -136,7 +137,7 @@ summary = {
     "flow": flow_path.name,
     "nodes": {
         "demo": {
-            "component_id": "ai.greentic.demo-comp",
+            "component_id": "ai.greentic.component-echo",
             "source": {
                 "kind": "local",
                 "path": relative_wasm,
@@ -153,13 +154,13 @@ summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True))
 PY
 
 greentic-pack update --in ${PACK_DIR}
-cp ${COMPONENT_DIR}/target/wasm32-wasip2/release/demo_comp.wasm ${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm
-cp ${COMPONENT_DIR}/component.manifest.json ${PACK_DIR}/components/ai.greentic.demo-comp/component.manifest.json
+cp ${REPO_ROOT}/crates/test-packs/echo-pack/components/ai.greentic.component-echo/component_echo.wasm ${PACK_DIR}/components/ai.greentic.component-echo/component.wasm
+cp ${REPO_ROOT}/crates/test-components/component-echo/component.manifest.json ${PACK_DIR}/components/ai.greentic.component-echo/component.manifest.json
 python3 - <<'PY'
 import json
 from pathlib import Path
 
-manifest_path = Path("${PACK_DIR}/components/ai.greentic.demo-comp/component.manifest.json")
+manifest_path = Path("${PACK_DIR}/components/ai.greentic.component-echo/component.manifest.json")
 data = json.loads(manifest_path.read_text())
 wasm = data.get("wasm")
 if isinstance(wasm, str):
@@ -178,8 +179,8 @@ elif isinstance(wasm, dict):
     data["wasm"] = wasm
 manifest_path.write_text(json.dumps(data, indent=2, sort_keys=True))
 PY
-mkdir -p ${PACK_DIR}/components/ai.greentic.demo-comp/target/wasm32-wasip2/release
-cp ${PACK_DIR}/components/ai.greentic.demo-comp/component.wasm ${PACK_DIR}/components/ai.greentic.demo-comp/target/wasm32-wasip2/release/demo_comp.wasm
+mkdir -p ${PACK_DIR}/components/ai.greentic.component-echo/target/wasm32-wasip2/release
+cp ${PACK_DIR}/components/ai.greentic.component-echo/component.wasm ${PACK_DIR}/components/ai.greentic.component-echo/target/wasm32-wasip2/release/component_echo.wasm
 greentic-pack resolve --in ${PACK_DIR} --offline
 greentic-pack build --in ${PACK_DIR} --allow-oci-tags --no-update
 greentic-pack doctor --in ${PACK_DIR} --allow-oci-tags
@@ -187,4 +188,4 @@ test -f ${PACK_DIR}/dist/demo-pack.gtpack
 
 greentic-runner-cli --pack ${PACK_DIR}/dist/demo-pack.gtpack --input "\"hello\"" --artifacts-dir ${ARTIFACTS_DIR} --json
 test -f ${ARTIFACTS_DIR}/transcript.jsonl
-sh -c 'if command -v rg >/dev/null 2>&1; then rg -q "ai.greentic.demo-comp" ${ARTIFACTS_DIR}/transcript.jsonl; else grep -q "ai.greentic.demo-comp" ${ARTIFACTS_DIR}/transcript.jsonl; fi'
+sh -c 'if command -v rg >/dev/null 2>&1; then rg -q "ai.greentic.component-echo" ${ARTIFACTS_DIR}/transcript.jsonl; else grep -q "ai.greentic.component-echo" ${ARTIFACTS_DIR}/transcript.jsonl; fi'
