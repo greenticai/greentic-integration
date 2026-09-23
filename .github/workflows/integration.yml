@@ -182,16 +182,18 @@ jobs:
       - lint
     env:
       GREENTIC_CONTROL_CHAIN_PATH: vendor/greentic-control-chain
-      CONTROL_CHAIN_GH_TOKEN: ${{ secrets.GREENTIC_GITHUB_TOKEN != '' && secrets.GREENTIC_GITHUB_TOKEN || github.token }}
       GREENTIC_FAST2FLOW_GH_TOKEN: ${{ secrets.GREENTIC_BIZ_GH_TOKEN != '' && secrets.GREENTIC_BIZ_GH_TOKEN || github.token }}
     steps:
       - uses: actions/checkout@v4
       - name: Checkout greentic-control-chain fixtures
         uses: actions/checkout@v4
+        # Public repo (moved from greentic-ai-org), so the job's own token is
+        # enough. It used GREENTIC_GITHUB_TOKEN, whose revocation failed this
+        # checkout with "Bad credentials" — the `!= ''` fallback never fires
+        # for a secret that is set but dead.
         with:
-          repository: greentic-ai-org/greentic-control-chain
+          repository: greenticai/greentic-control-chain
           path: vendor/greentic-control-chain
-          token: ${{ env.CONTROL_CHAIN_GH_TOKEN }}
       - uses: dtolnay/rust-toolchain@1.94.0
         with:
           toolchain: 1.94.0
